@@ -26,6 +26,7 @@
 - `POST /api/jobs/{job_id}/upload-session`
 - `PUT /api/uploads/{token}`
 - `GET /api/jobs/{job_id}/assets`
+- `POST /api/jobs/{job_id}/start`
 
 ## Upload Session Flow
 
@@ -34,6 +35,7 @@
 3. API returns tokenized upload targets.
 4. Frontend uploads each file directly using `PUT /api/uploads/{token}`.
 5. Uploaded assets are tracked via `GET /api/jobs/{job_id}/assets`.
+6. Pipeline starts automatically when all reserved assets are uploaded, or manually with `POST /api/jobs/{job_id}/start`.
 
 ## Supabase Setup
 

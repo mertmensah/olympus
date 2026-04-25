@@ -60,7 +60,17 @@ async def upload_file(token: str, request: Request) -> dict[str, str | int]:
     except RuntimeError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
+    job_store.auto_start_if_ready(UUID(payload["job_id"]))
+
     return {"status": "uploaded", "file_key": file_key, "size_bytes": size_bytes}
+
+
+@router.post("/jobs/{job_id}/start", response_model=JobStatus)
+def start_job_pipeline(job_id: UUID) -> JobStatus:
+    status = job_store.start_pipeline(job_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return status
 
 
 @router.get("/jobs/{job_id}/assets", response_model=list[UploadedAsset])

@@ -1,14 +1,27 @@
 import { useEffect, useState } from "react";
-import { getJobAssets, getJobStatus } from "../services/api";
+import { getJobAssets, getJobStatus, startJobPipeline } from "../services/api";
 
 export default function ViewerPage({ activeJob }) {
   const [job, setJob] = useState(activeJob);
   const [assets, setAssets] = useState([]);
   const [error, setError] = useState("");
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     setJob(activeJob);
   }, [activeJob]);
+
+  useEffect(() => {
+    if (!job?.id || job.status !== "processing") {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      refreshStatus();
+    }, 1500);
+
+    return () => window.clearInterval(timer);
+  }, [job?.id, job?.status]);
 
   async function refreshStatus() {
     if (!job?.id) {
@@ -22,6 +35,24 @@ export default function ViewerPage({ activeJob }) {
       setError("");
     } catch (requestError) {
       setError(requestError.message || "Unable to fetch job status.");
+    }
+  }
+
+  async function handleStartPipeline() {
+    if (!job?.id) {
+      return;
+    }
+
+    setStarting(true);
+    try {
+      const next = await startJobPipeline(job.id);
+      setJob(next);
+      setError("");
+      await refreshStatus();
+    } catch (requestError) {
+      setError(requestError.message || "Unable to start pipeline.");
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -48,6 +79,14 @@ export default function ViewerPage({ activeJob }) {
           </p>
           <button className="primary" onClick={refreshStatus}>
             Refresh Status
+          </button>
+
+          <button
+            className="primary"
+            onClick={handleStartPipeline}
+            disabled={starting || job.status === "processing" || job.status === "completed"}
+          >
+            {starting ? "Starting..." : "Start Generation"}
           </button>
 
           <p>

@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 from app.core.config import settings
 from app.models.schemas import JobCreateRequest, JobRecord, JobStatus, UploadSessionRequest, UploadSessionResponse, UploadTarget
 from app.services.database import database
+from app.services.pipeline_worker import pipeline_worker
 from app.services.upload_tokens import create_upload_token
 
 
@@ -46,6 +47,40 @@ class JobStore:
 
     def list_assets(self, job_id: UUID):
         return database.list_assets(job_id)
+
+    def start_pipeline(self, job_id: UUID) -> JobStatus | None:
+        status = self.get(job_id)
+        if status is None:
+            return None
+
+        total_assets, uploaded_assets = database.asset_counts(job_id)
+        if total_assets == 0 or uploaded_assets < total_assets:
+            return status
+
+        if status.status == "completed":
+            return status
+
+        started = pipeline_worker.enqueue(job_id)
+        if started:
+            return database.update_job_state(job_id=job_id, status="processing", stage="ingest")
+        return self.get(job_id)
+
+    def auto_start_if_ready(self, job_id: UUID) -> bool:
+        status = self.get(job_id)
+        if status is None:
+            return False
+
+        if status.status in {"processing", "completed"}:
+            return False
+
+        total_assets, uploaded_assets = database.asset_counts(job_id)
+        if total_assets == 0 or uploaded_assets < total_assets:
+            return False
+
+        started = pipeline_worker.enqueue(job_id)
+        if started:
+            database.update_job_state(job_id=job_id, status="processing", stage="ingest")
+        return started
 
     @staticmethod
     def _extension_from_content_type(content_type: str) -> str:

@@ -59,3 +59,9 @@ export async function uploadToTarget(target, file) {
 export function getJobAssets(jobId) {
   return request(`/api/jobs/${jobId}/assets`);
 }
+
+export function startJobPipeline(jobId) {
+  return request(`/api/jobs/${jobId}/start`, {
+    method: "POST"
+  });
+}
