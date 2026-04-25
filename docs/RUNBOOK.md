@@ -38,11 +38,11 @@
 ## Supabase Setup
 
 1. In Supabase, go to Settings -> API.
-2. Copy project URL and service role key.
+2. Copy project URL and Secret key.
 3. In Storage, create a private bucket named `olympus_media` or your selected bucket name.
 4. Put values in `backend/.env`.
 
-Never commit `backend/.env` or expose service role key in frontend code.
+Never commit `backend/.env` or expose Secret key in frontend code.
 
 ## GitHub Pages Deployment
 

@@ -7,7 +7,7 @@ from app.core.config import settings
 
 class StorageService:
     def upload_bytes(self, file_key: str, content_type: str, payload: bytes) -> None:
-        if not settings.supabase_url or not settings.supabase_service_role_key:
+        if not settings.supabase_url or not settings.supabase_secret_key:
             raise RuntimeError("Supabase credentials are not configured.")
 
         upload_url = (
@@ -16,8 +16,8 @@ class StorageService:
         )
 
         headers = {
-            "Authorization": f"Bearer {settings.supabase_service_role_key}",
-            "apikey": settings.supabase_service_role_key,
+            "Authorization": f"Bearer {settings.supabase_secret_key}",
+            "apikey": settings.supabase_secret_key,
             "Content-Type": content_type,
             "x-upsert": "true",
         }

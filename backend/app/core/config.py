@@ -14,7 +14,7 @@ class Settings(BaseModel):
     upload_token_secret: str = os.getenv("OLYMPUS_UPLOAD_TOKEN_SECRET", "dev-secret-change-me")
     upload_token_ttl_seconds: int = int(os.getenv("OLYMPUS_UPLOAD_TOKEN_TTL", "3600"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")
-    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    supabase_secret_key: str = os.getenv("SUPABASE_SECRET_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""))
     supabase_bucket_name: str = os.getenv("SUPABASE_BUCKET_NAME", "olympus_media")
 
 
