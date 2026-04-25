@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { getJobAssets, getJobStatus, startJobPipeline } from "../services/api";
+import { getJobArtifacts, getJobAssets, getJobStatus, startJobPipeline } from "../services/api";
 
 export default function ViewerPage({ activeJob }) {
   const [job, setJob] = useState(activeJob);
   const [assets, setAssets] = useState([]);
+  const [artifacts, setArtifacts] = useState([]);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
 
@@ -29,9 +30,14 @@ export default function ViewerPage({ activeJob }) {
     }
 
     try {
-      const [latest, uploadedAssets] = await Promise.all([getJobStatus(job.id), getJobAssets(job.id)]);
+      const [latest, uploadedAssets, stageArtifacts] = await Promise.all([
+        getJobStatus(job.id),
+        getJobAssets(job.id),
+        getJobArtifacts(job.id)
+      ]);
       setJob(latest);
       setAssets(uploadedAssets);
+      setArtifacts(stageArtifacts);
       setError("");
     } catch (requestError) {
       setError(requestError.message || "Unable to fetch job status.");
@@ -99,6 +105,21 @@ export default function ViewerPage({ activeJob }) {
                 <li key={asset.file_key}>
                   <span>{asset.file_key}</span>
                   <span>{asset.status}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          <p>
+            <strong>Stage artifacts:</strong> {artifacts.length}
+          </p>
+
+          {artifacts.length ? (
+            <ul className="artifact-list">
+              {artifacts.map((artifact, idx) => (
+                <li key={`${artifact.stage}-${idx}`}>
+                  <span>{artifact.stage}</span>
+                  <span>{artifact.created_at}</span>
                 </li>
               ))}
             </ul>

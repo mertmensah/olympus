@@ -27,6 +27,7 @@
 - `PUT /api/uploads/{token}`
 - `GET /api/jobs/{job_id}/assets`
 - `POST /api/jobs/{job_id}/start`
+- `GET /api/jobs/{job_id}/artifacts`
 
 ## Upload Session Flow
 
@@ -36,6 +37,12 @@
 4. Frontend uploads each file directly using `PUT /api/uploads/{token}`.
 5. Uploaded assets are tracked via `GET /api/jobs/{job_id}/assets`.
 6. Pipeline starts automatically when all reserved assets are uploaded, or manually with `POST /api/jobs/{job_id}/start`.
+7. Stage artifacts can be inspected via `GET /api/jobs/{job_id}/artifacts`.
+
+## Stage Outputs
+
+- Each stage writes JSON output to `backend/data/stage_outputs/{job_id}/`.
+- Artifacts are also stored in SQLite for API retrieval and UI display.
 
 ## Supabase Setup
 

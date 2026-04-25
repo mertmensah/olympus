@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from typing import Literal
 from uuid import UUID
 
@@ -61,3 +62,10 @@ class UploadedAsset(BaseModel):
     size_bytes: int
     status: Literal["pending", "uploaded"]
     uploaded_at: datetime | None = None
+    storage_path: str | None = None
+
+
+class JobArtifact(BaseModel):
+    stage: Literal["ingest", "quality", "reconstruct", "postprocess", "deliver"]
+    payload: dict[str, Any]
+    created_at: datetime

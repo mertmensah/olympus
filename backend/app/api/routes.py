@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
 
-from app.models.schemas import JobCreateRequest, JobRecord, JobStatus, UploadSessionRequest, UploadSessionResponse, UploadedAsset
+from app.models.schemas import JobArtifact, JobCreateRequest, JobRecord, JobStatus, UploadSessionRequest, UploadSessionResponse, UploadedAsset
 from app.services.job_store import job_store
 from app.services.upload_tokens import store_uploaded_file, verify_upload_token
 
@@ -79,3 +79,11 @@ def list_job_assets(job_id: UUID) -> list[UploadedAsset]:
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job_store.list_assets(job_id)
+
+
+@router.get("/jobs/{job_id}/artifacts", response_model=list[JobArtifact])
+def list_job_artifacts(job_id: UUID) -> list[JobArtifact]:
+    job = job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job_store.list_artifacts(job_id)

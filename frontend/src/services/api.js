@@ -60,6 +60,10 @@ export function getJobAssets(jobId) {
   return request(`/api/jobs/${jobId}/assets`);
 }
 
+export function getJobArtifacts(jobId) {
+  return request(`/api/jobs/${jobId}/artifacts`);
+}
+
 export function startJobPipeline(jobId) {
   return request(`/api/jobs/${jobId}/start`, {
     method: "POST"

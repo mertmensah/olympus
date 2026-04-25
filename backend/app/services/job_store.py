@@ -48,6 +48,9 @@ class JobStore:
     def list_assets(self, job_id: UUID):
         return database.list_assets(job_id)
 
+    def list_artifacts(self, job_id: UUID):
+        return database.list_job_artifacts(job_id)
+
     def start_pipeline(self, job_id: UUID) -> JobStatus | None:
         status = self.get(job_id)
         if status is None:

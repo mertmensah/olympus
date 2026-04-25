@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
-from time import sleep
 from uuid import UUID
 
 from app.services.database import database
+from app.services.pipeline_stages import (
+    run_deliver_stage,
+    run_ingest_stage,
+    run_postprocess_stage,
+    run_quality_stage,
+    run_reconstruct_stage,
+)
 
 
 class PipelineWorker:
@@ -24,22 +30,29 @@ class PipelineWorker:
         return True
 
     def _run_pipeline(self, job_id: UUID) -> None:
+        current_stage = "ingest"
         try:
             self._set_state(job_id, "processing", "ingest")
-            sleep(1)
+            database.save_job_artifact(job_id, "ingest", run_ingest_stage(job_id))
 
+            current_stage = "quality"
             self._set_state(job_id, "processing", "quality")
-            sleep(1)
+            database.save_job_artifact(job_id, "quality", run_quality_stage(job_id))
 
+            current_stage = "reconstruct"
             self._set_state(job_id, "processing", "reconstruct")
-            sleep(2)
+            database.save_job_artifact(job_id, "reconstruct", run_reconstruct_stage(job_id))
 
+            current_stage = "postprocess"
             self._set_state(job_id, "processing", "postprocess")
-            sleep(1)
+            database.save_job_artifact(job_id, "postprocess", run_postprocess_stage(job_id))
+
+            current_stage = "deliver"
+            database.save_job_artifact(job_id, "deliver", run_deliver_stage(job_id))
 
             self._set_state(job_id, "completed", "deliver")
         except Exception:
-            self._set_state(job_id, "failed", "ingest")
+            self._set_state(job_id, "failed", current_stage)
         finally:
             with self._lock:
                 self._active_jobs.discard(job_id)

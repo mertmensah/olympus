@@ -6,7 +6,9 @@ from pathlib import Path
 from threading import RLock
 from uuid import UUID
 
-from app.models.schemas import JobCreateRequest, JobRecord, JobStatus, MediaSummary, UploadedAsset
+import json
+
+from app.models.schemas import JobArtifact, JobCreateRequest, JobRecord, JobStatus, MediaSummary, UploadedAsset
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 DB_PATH = DATA_DIR / "olympus.db"
@@ -48,6 +50,17 @@ class Database:
                     uploaded_at TEXT,
                     storage_path TEXT,
                     UNIQUE(job_id, file_key)
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS job_artifacts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL,
+                    stage TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
                 )
                 """
             )
@@ -149,7 +162,7 @@ class Database:
         with self._lock:
             rows = self._connection.execute(
                 """
-                SELECT file_key, content_type, size_bytes, status, uploaded_at
+                SELECT file_key, content_type, size_bytes, status, uploaded_at, storage_path
                 FROM assets
                 WHERE job_id = ?
                 ORDER BY id ASC
@@ -166,6 +179,7 @@ class Database:
                     size_bytes=row["size_bytes"],
                     status=row["status"],
                     uploaded_at=datetime.fromisoformat(row["uploaded_at"]) if row["uploaded_at"] else None,
+                    storage_path=row["storage_path"],
                 )
             )
         return assets
@@ -185,6 +199,41 @@ class Database:
         if row is None:
             return (0, 0)
         return (int(row["total_count"] or 0), int(row["uploaded_count"] or 0))
+
+    def save_job_artifact(self, job_id: UUID, stage: str, payload: dict) -> None:
+        created_at = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            self._connection.execute(
+                """
+                INSERT INTO job_artifacts (job_id, stage, payload_json, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (str(job_id), stage, json.dumps(payload), created_at),
+            )
+            self._connection.commit()
+
+    def list_job_artifacts(self, job_id: UUID) -> list[JobArtifact]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT stage, payload_json, created_at
+                FROM job_artifacts
+                WHERE job_id = ?
+                ORDER BY id ASC
+                """,
+                (str(job_id),),
+            ).fetchall()
+
+        artifacts: list[JobArtifact] = []
+        for row in rows:
+            artifacts.append(
+                JobArtifact(
+                    stage=row["stage"],
+                    payload=json.loads(row["payload_json"]),
+                    created_at=datetime.fromisoformat(row["created_at"]),
+                )
+            )
+        return artifacts
 
 
 database = Database()
