@@ -8,7 +8,7 @@ from uuid import UUID
 
 import json
 
-from app.models.schemas import JobArtifact, JobCreateRequest, JobRecord, JobStatus, MediaSummary, UploadedAsset
+from app.models.schemas import JobArtifact, JobCreateRequest, JobRecord, JobStatus, MediaSummary, SubjectRecord, SubjectRevision, UploadedAsset
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 DB_PATH = DATA_DIR / "olympus.db"
@@ -64,15 +64,46 @@ class Database:
                 )
                 """
             )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS subjects (
+                    id TEXT PRIMARY KEY,
+                    display_name TEXT NOT NULL DEFAULT '',
+                    age INTEGER NOT NULL,
+                    height_cm INTEGER NOT NULL,
+                    generation INTEGER NOT NULL DEFAULT 0,
+                    confidence REAL NOT NULL DEFAULT 0.0,
+                    current_glb_key TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS subject_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subject_id TEXT NOT NULL REFERENCES subjects(id),
+                    job_id TEXT NOT NULL REFERENCES jobs(id),
+                    glb_key TEXT NOT NULL,
+                    quality_score REAL NOT NULL DEFAULT 0.0,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            # Migrate existing jobs table: add subject_id if absent
+            existing_cols = {row[1] for row in self._connection.execute("PRAGMA table_info(jobs)").fetchall()}
+            if "subject_id" not in existing_cols:
+                self._connection.execute("ALTER TABLE jobs ADD COLUMN subject_id TEXT REFERENCES subjects(id)")
             self._connection.commit()
 
-    def create_job(self, job_id: UUID, payload: JobCreateRequest) -> JobStatus:
+    def create_job(self, job_id: UUID, payload: JobCreateRequest, subject_id: UUID | None = None) -> JobStatus:
         now_iso = datetime.now(timezone.utc).isoformat()
         with self._lock:
             self._connection.execute(
                 """
-                INSERT INTO jobs (id, age, height_cm, photo_count, video_count, status, stage, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO jobs (id, age, height_cm, photo_count, video_count, status, stage, created_at, subject_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(job_id),
@@ -83,6 +114,7 @@ class Database:
                     "queued",
                     "ingest",
                     now_iso,
+                    str(subject_id) if subject_id else None,
                 ),
             )
             self._connection.commit()
@@ -102,7 +134,7 @@ class Database:
         with self._lock:
             row = self._connection.execute(
                 """
-                SELECT id, age, height_cm, photo_count, video_count, status, stage, created_at
+                SELECT id, age, height_cm, photo_count, video_count, status, stage, created_at, subject_id
                 FROM jobs
                 WHERE id = ?
                 """,
@@ -119,6 +151,7 @@ class Database:
             status=row["status"],
             stage=row["stage"],
             created_at=datetime.fromisoformat(row["created_at"]),
+            subject_id=UUID(row["subject_id"]) if row["subject_id"] else None,
         )
 
     def update_job_state(self, job_id: UUID, status: str, stage: str) -> JobStatus | None:
@@ -234,6 +267,126 @@ class Database:
                 )
             )
         return artifacts
+
+    # ------------------------------------------------------------------
+    # Subject methods
+    # ------------------------------------------------------------------
+
+    def create_subject(self, subject_id: UUID, display_name: str, age: int, height_cm: int) -> SubjectRecord:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            self._connection.execute(
+                """
+                INSERT INTO subjects (id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 0, 0.0, NULL, ?, ?)
+                """,
+                (str(subject_id), display_name, age, height_cm, now_iso, now_iso),
+            )
+            self._connection.commit()
+        return self.get_subject(subject_id)  # type: ignore[return-value]
+
+    def get_subject(self, subject_id: UUID) -> SubjectRecord | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at FROM subjects WHERE id = ?",
+                (str(subject_id),),
+            ).fetchone()
+        if row is None:
+            return None
+        return SubjectRecord(
+            id=UUID(row["id"]),
+            display_name=row["display_name"],
+            age=row["age"],
+            height_cm=row["height_cm"],
+            generation=row["generation"],
+            confidence=row["confidence"],
+            current_glb_key=row["current_glb_key"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+        )
+
+    def list_subjects(self) -> list[SubjectRecord]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at FROM subjects ORDER BY created_at DESC"
+            ).fetchall()
+        return [
+            SubjectRecord(
+                id=UUID(row["id"]),
+                display_name=row["display_name"],
+                age=row["age"],
+                height_cm=row["height_cm"],
+                generation=row["generation"],
+                confidence=row["confidence"],
+                current_glb_key=row["current_glb_key"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+                updated_at=datetime.fromisoformat(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def promote_subject_glb(self, subject_id: UUID, new_glb_key: str, quality_score: float) -> None:
+        """Update the subject's current GLB and increment generation + confidence."""
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            # Weighted rolling average: new confidence = 70% previous + 30% latest
+            row = self._connection.execute(
+                "SELECT confidence, generation FROM subjects WHERE id = ?",
+                (str(subject_id),),
+            ).fetchone()
+            if row is None:
+                return
+            prev_confidence = float(row["confidence"])
+            generation = int(row["generation"])
+            new_confidence = round(prev_confidence * 0.7 + quality_score * 0.3, 2) if generation > 0 else round(quality_score, 2)
+            self._connection.execute(
+                """
+                UPDATE subjects
+                SET current_glb_key = ?, generation = ?, confidence = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (new_glb_key, generation + 1, new_confidence, now_iso, str(subject_id)),
+            )
+            self._connection.commit()
+
+    def add_subject_revision(self, subject_id: UUID, job_id: UUID, glb_key: str, quality_score: float) -> SubjectRevision:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            cursor = self._connection.execute(
+                """
+                INSERT INTO subject_revisions (subject_id, job_id, glb_key, quality_score, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (str(subject_id), str(job_id), glb_key, quality_score, now_iso),
+            )
+            self._connection.commit()
+            revision_id = cursor.lastrowid
+        return SubjectRevision(
+            id=revision_id,
+            subject_id=subject_id,
+            job_id=job_id,
+            glb_key=glb_key,
+            quality_score=quality_score,
+            created_at=datetime.fromisoformat(now_iso),
+        )
+
+    def list_subject_revisions(self, subject_id: UUID) -> list[SubjectRevision]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT id, subject_id, job_id, glb_key, quality_score, created_at FROM subject_revisions WHERE subject_id = ? ORDER BY id ASC",
+                (str(subject_id),),
+            ).fetchall()
+        return [
+            SubjectRevision(
+                id=row["id"],
+                subject_id=UUID(row["subject_id"]),
+                job_id=UUID(row["job_id"]),
+                glb_key=row["glb_key"],
+                quality_score=row["quality_score"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+            )
+            for row in rows
+        ]
 
 
 database = Database()

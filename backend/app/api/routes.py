@@ -3,9 +3,21 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from app.models.schemas import JobArtifact, JobCreateRequest, JobRecord, JobStatus, UploadSessionRequest, UploadSessionResponse, UploadedAsset
+from app.models.schemas import (
+    JobArtifact,
+    JobCreateRequest,
+    JobRecord,
+    JobStatus,
+    SubjectCreateRequest,
+    SubjectRecord,
+    SubjectRevision,
+    UploadSessionRequest,
+    UploadSessionResponse,
+    UploadedAsset,
+)
 from app.services.job_store import job_store
 from app.services.storage_service import storage_service
+from app.services.subject_store import subject_store
 from app.services.upload_tokens import store_uploaded_file, verify_upload_token
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -177,3 +189,57 @@ def get_job_debug(job_id: UUID) -> dict:
         },
         "storage_probe": storage_probe,
     }
+
+
+# -----------------------------------------------------------------------
+# Subject routes
+# -----------------------------------------------------------------------
+
+@router.post("/subjects", response_model=SubjectRecord, status_code=201)
+def create_subject(payload: SubjectCreateRequest) -> SubjectRecord:
+    return subject_store.create(payload)
+
+
+@router.get("/subjects", response_model=list[SubjectRecord])
+def list_subjects() -> list[SubjectRecord]:
+    return subject_store.list_all()
+
+
+@router.get("/subjects/{subject_id}", response_model=SubjectRecord)
+def get_subject(subject_id: UUID) -> SubjectRecord:
+    subject = subject_store.get(subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    return subject
+
+
+@router.get("/subjects/{subject_id}/revisions", response_model=list[SubjectRevision])
+def list_subject_revisions(subject_id: UUID) -> list[SubjectRevision]:
+    subject = subject_store.get(subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    return subject_store.list_revisions(subject_id)
+
+
+@router.post("/subjects/{subject_id}/jobs", response_model=JobStatus, status_code=201)
+def create_job_for_subject(subject_id: UUID, payload: JobCreateRequest) -> JobStatus:
+    """Create a new refinement job linked to an existing subject."""
+    subject = subject_store.get(subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    return job_store.create(payload, subject_id=subject_id)
+
+
+@router.get("/subjects/{subject_id}/reconstruction")
+def get_subject_reconstruction(subject_id: UUID) -> Response:
+    """Serve the subject's current best GLB directly."""
+    subject = subject_store.get(subject_id)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    if not subject.current_glb_key:
+        raise HTTPException(status_code=404, detail="Subject has no reconstruction yet — submit a job first")
+    try:
+        glb_bytes = storage_service.download_bytes(subject.current_glb_key)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to download subject GLB: {exc}") from exc
+    return Response(content=glb_bytes, media_type="model/gltf-binary")

@@ -197,14 +197,68 @@ def run_postprocess_stage(job_id: UUID) -> dict:
 
 
 def run_deliver_stage(job_id: UUID) -> dict:
+    record = database.get_job_record(job_id)
+    subject_glb_key: str | None = None
+    subject_generation: int | None = None
+
+    if record and record.subject_id:
+        subject_id = record.subject_id
+        artifacts = database.list_job_artifacts(job_id)
+        reconstruct = next((a for a in artifacts if a.stage == "reconstruct"), None)
+        quality = next((a for a in artifacts if a.stage == "quality"), None)
+
+        if reconstruct:
+            src_key: str = reconstruct.payload.get("output_asset_key", "")
+            quality_score = float(quality.payload.get("quality_score", 0.0)) if quality else 0.0
+
+            # Archive the previous current.glb as a revision (best-effort)
+            existing = database.get_subject(subject_id)
+            if existing and existing.current_glb_key:
+                try:
+                    archive_key = f"subjects/{subject_id}/revisions/{job_id}.glb"
+                    storage_service.copy_bytes(existing.current_glb_key, archive_key)
+                except Exception:
+                    logger.warning("Could not archive previous GLB for subject %s", subject_id)
+
+            # Promote new GLB to subjects/{id}/current.glb
+            subject_glb_key = f"subjects/{subject_id}/current.glb"
+            try:
+                storage_service.copy_bytes(src_key, subject_glb_key)
+                database.promote_subject_glb(subject_id, subject_glb_key, quality_score)
+                database.add_subject_revision(subject_id, job_id, subject_glb_key, quality_score)
+                subject_record = database.get_subject(subject_id)
+                subject_generation = subject_record.generation if subject_record else None
+                logger.info(
+                    "Subject GLB promoted",
+                    extra={"subject_id": str(subject_id), "job_id": str(job_id), "glb_key": subject_glb_key},
+                )
+            except Exception:
+                logger.exception("Failed to promote GLB for subject %s", subject_id)
+
+    # Clean up raw input assets after successful delivery (best-effort)
+    _cleanup_input_assets(job_id)
+
     payload = {
         "job_id": str(job_id),
         "viewer_manifest": f"{job_id}/outputs/viewer-manifest.json",
         "delivery_status": "available",
+        "subject_glb_key": subject_glb_key,
+        "subject_generation": subject_generation,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     _write_stage_output(job_id, "deliver", payload)
     return payload
+
+
+def _cleanup_input_assets(job_id: UUID) -> None:
+    """Delete raw uploaded files from storage after pipeline completes. Non-fatal."""
+    assets = [a for a in database.list_assets(job_id) if a.status == "uploaded"]
+    for asset in assets:
+        try:
+            storage_service.delete_bytes(asset.file_key)
+            logger.info("Deleted input asset %s", asset.file_key)
+        except Exception:
+            logger.warning("Could not delete input asset %s", asset.file_key)
 
 
 _MAX_ANALYSIS_PX = 1024  # cap before PIL expands into RAM

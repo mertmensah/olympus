@@ -8,9 +8,9 @@ from app.services.upload_tokens import create_upload_token
 
 
 class JobStore:
-    def create(self, payload: JobCreateRequest) -> JobStatus:
+    def create(self, payload: JobCreateRequest, subject_id: UUID | None = None) -> JobStatus:
         job_id = uuid4()
-        return database.create_job(job_id, payload)
+        return database.create_job(job_id, payload, subject_id=subject_id)
 
     def get(self, job_id: UUID) -> JobStatus | None:
         return database.get_job_status(job_id)

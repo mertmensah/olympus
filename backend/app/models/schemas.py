@@ -28,6 +28,7 @@ class JobRecord(JobStatus):
     height_cm: int = Field(ge=80, le=260)
     media_summary: MediaSummary
     created_at: datetime
+    subject_id: UUID | None = None
 
 
 class UploadTarget(BaseModel):
@@ -68,4 +69,31 @@ class UploadedAsset(BaseModel):
 class JobArtifact(BaseModel):
     stage: Literal["ingest", "quality", "reconstruct", "postprocess", "deliver"]
     payload: dict[str, Any]
+    created_at: datetime
+
+
+class SubjectCreateRequest(BaseModel):
+    display_name: str = Field(default="", max_length=120)
+    age: int = Field(ge=13, le=120)
+    height_cm: int = Field(ge=80, le=260)
+
+
+class SubjectRecord(BaseModel):
+    id: UUID
+    display_name: str
+    age: int
+    height_cm: int
+    generation: int          # how many successful jobs have improved this subject
+    confidence: float        # rolling quality score (0–100)
+    current_glb_key: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SubjectRevision(BaseModel):
+    id: int
+    subject_id: UUID
+    job_id: UUID
+    glb_key: str
+    quality_score: float
     created_at: datetime
