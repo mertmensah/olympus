@@ -16,6 +16,7 @@ from PIL import Image, ImageFilter, ImageStat
 
 from app.core.config import settings
 from app.services.database import DATA_DIR, database
+from app.services.model_selector import get_model_selector
 from app.services.reconstruct_adapters.base import ReconstructAdapterInput
 from app.services.reconstruct_adapters.registry import get_reconstruct_adapter
 from app.services.storage_service import storage_service
@@ -107,7 +108,14 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
 
     selected_assets = _select_reconstruction_assets(quality_artifact.payload if quality_artifact else {})
 
-    adapter = get_reconstruct_adapter(settings.reconstruct_adapter)
+    # Use intelligent model selection
+    selector = get_model_selector()
+    adapter, adapter_name = selector.select_adapter(
+        quality_score=quality_score,
+        asset_count=len(selected_assets)
+    )
+    selection_metadata = selector.get_selection_metadata(quality_score, len(selected_assets))
+
     adapter_input = ReconstructAdapterInput(
         job_id=str(job_id),
         selected_assets=selected_assets,
@@ -145,6 +153,7 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
             "output_size_bytes": len(adapter_output.payload_bytes),
             "content_type": adapter_output.content_type,
         },
+        "model_selection": selection_metadata,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     _write_stage_output(job_id, "reconstruct", payload)
