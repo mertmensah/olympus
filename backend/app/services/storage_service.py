@@ -26,5 +26,22 @@ class StorageService:
         if response.status_code >= 400:
             raise RuntimeError(f"Supabase upload failed: {response.status_code} {response.text}")
 
+    def download_bytes(self, file_key: str) -> bytes:
+        if not settings.supabase_url or not settings.supabase_secret_key:
+            raise RuntimeError("Supabase credentials are not configured.")
+
+        download_url = (
+            f"{settings.supabase_url}/storage/v1/object/"
+            f"{settings.supabase_bucket_name}/{file_key}"
+        )
+        headers = {
+            "Authorization": f"Bearer {settings.supabase_secret_key}",
+            "apikey": settings.supabase_secret_key,
+        }
+        response = requests.get(download_url, headers=headers, timeout=30)
+        if response.status_code >= 400:
+            raise RuntimeError(f"Supabase download failed: {response.status_code} {response.text}")
+        return response.content
+
 
 storage_service = StorageService()

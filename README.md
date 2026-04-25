@@ -26,7 +26,8 @@ Olympus enables users to upload photos, short videos, and voice clips, then gene
 	- API service client for job flow
 - `backend/`:
 	- API routes for health checks and job lifecycle
-	- In-memory job store for early integration testing
+	- SQLite-backed job and artifact persistence
+	- Preprocessing stages for image quality and video frame extraction
 - `docs/`:
 	- Architecture, model strategy, and runbook
 

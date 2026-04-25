@@ -43,6 +43,13 @@
 
 - Each stage writes JSON output to `backend/data/stage_outputs/{job_id}/`.
 - Artifacts are also stored in SQLite for API retrieval and UI display.
+- Quality stage now computes per-asset metrics for images (brightness and edge-based sharpness).
+- Video assets are sampled through ffmpeg frame extraction to produce frame-quality summaries.
+
+## Preprocessing Dependencies
+
+- `Pillow` for image metrics.
+- `imageio-ffmpeg` for local ffmpeg binary access and frame extraction.
 
 ## Supabase Setup
 
