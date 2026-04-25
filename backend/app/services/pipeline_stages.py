@@ -137,10 +137,12 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
 
     tracemalloc.start()
     start_ts = perf_counter()
-    adapter_output = adapter.run(adapter_input)
-    latency_ms = (perf_counter() - start_ts) * 1000.0
-    _, peak_bytes = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    try:
+        adapter_output = adapter.run(adapter_input)
+    finally:
+        latency_ms = (perf_counter() - start_ts) * 1000.0
+        _, peak_bytes = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
 
     storage_service.upload_bytes(
         file_key=adapter_output.output_asset_key,
@@ -205,12 +207,17 @@ def run_deliver_stage(job_id: UUID) -> dict:
     return payload
 
 
+_MAX_ANALYSIS_PX = 1024  # cap before PIL expands into RAM
+
+
 def _analyze_image(blob: bytes) -> dict:
     with Image.open(io.BytesIO(blob)) as image:
+        image.thumbnail((_MAX_ANALYSIS_PX, _MAX_ANALYSIS_PX), Image.LANCZOS)
         gray = image.convert("L")
         brightness = float(ImageStat.Stat(gray).mean[0])
         edges = gray.filter(ImageFilter.FIND_EDGES)
         edge_variance = float(ImageStat.Stat(edges).var[0])
+        del gray, edges  # release before next image
 
     exposure_score = max(0.0, 100.0 - abs(brightness - 128.0) * 0.9)
     sharpness_score = min(100.0, edge_variance * 4.0)

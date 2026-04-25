@@ -9,6 +9,7 @@ export default function ViewerPage({ activeJob }) {
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const [modelUrl, setModelUrl] = useState(null);
+  const [modelLoaded, setModelLoaded] = useState(false);
   const [viewerStatus, setViewerStatus] = useState("Waiting for reconstruction output.");
   const [debugInfo, setDebugInfo] = useState(null);
 
@@ -25,11 +26,17 @@ export default function ViewerPage({ activeJob }) {
   }, [activeJob]);
 
   const handleViewerStatusChange = useCallback(({ level, message }) => {
+    if (level === "success") {
+      setModelLoaded(true);
+    }
+    if (level === "error") {
+      setModelLoaded(false);
+    }
     setViewerStatus(`${level.toUpperCase()}: ${message}`);
   }, []);
 
   useEffect(() => {
-    if (!job?.id || job.status !== "processing") {
+    if (!job?.id || job.status !== "processing" || modelLoaded) {
       return;
     }
 
@@ -38,7 +45,7 @@ export default function ViewerPage({ activeJob }) {
     }, 1500);
 
     return () => window.clearInterval(timer);
-  }, [job?.id, job?.status]);
+  }, [job?.id, job?.status, modelLoaded]);
 
   async function refreshStatus() {
     if (!job?.id) {
@@ -62,18 +69,24 @@ export default function ViewerPage({ activeJob }) {
         const contentType = reconstructArtifact.payload?.runtime?.content_type;
         if (fileKey) {
           if (contentType === "model/gltf-binary") {
-            setModelUrl(getReconstructionFileUrl(job.id));
-            setViewerStatus(`Reconstruction artifact found: ${fileKey}`);
+            const nextModelUrl = getReconstructionFileUrl(job.id);
+            setModelUrl((current) => (current === nextModelUrl ? current : nextModelUrl));
+            if (!modelLoaded) {
+              setViewerStatus(`Reconstruction artifact found: ${fileKey}`);
+            }
           } else {
             setModelUrl(null);
+            setModelLoaded(false);
             setViewerStatus(
               `Reconstruction output is ${contentType || "unknown"}, expected model/gltf-binary. Run a fresh job after backend restart.`
             );
           }
         } else {
+          setModelLoaded(false);
           setViewerStatus("Reconstruct artifact exists, but output key is missing.");
         }
       } else {
+        setModelLoaded(false);
         setViewerStatus("Reconstruct artifact not available yet.");
       }
       

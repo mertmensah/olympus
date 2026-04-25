@@ -16,6 +16,7 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
     if (!modelUrl || !containerRef.current) {
       return;
     }
+    let disposed = false;
     statusRef.current?.({ level: "info", message: `Loading model from ${modelUrl}` });
 
     // Initialize Three.js scene
@@ -61,6 +62,9 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
     loader.load(
       modelUrl,
       (gltf) => {
+        if (disposed) {
+          return;
+        }
         const model = gltf.scene;
         modelRoot = model;
         model.position.set(0, 0, 0);
@@ -102,6 +106,9 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
         });
       },
       (progress) => {
+        if (disposed) {
+          return;
+        }
         if (progress.total > 0) {
           statusRef.current?.({
             level: "info",
@@ -110,6 +117,9 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
         }
       },
       (error) => {
+        if (disposed) {
+          return;
+        }
         const msg = error?.message || String(error);
         statusRef.current?.({ level: "error", message: `Model load failed: ${msg}` });
         console.error("Error loading model:", error);
@@ -140,6 +150,7 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
 
     // Cleanup
     return () => {
+      disposed = true;
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
       }
