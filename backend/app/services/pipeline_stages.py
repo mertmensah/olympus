@@ -4,15 +4,20 @@ import io
 import json
 import subprocess
 import tempfile
+import tracemalloc
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from statistics import mean
 from uuid import UUID
 
 import imageio_ffmpeg
 from PIL import Image, ImageFilter, ImageStat
 
+from app.core.config import settings
 from app.services.database import DATA_DIR, database
+from app.services.reconstruct_adapters.base import ReconstructAdapterInput
+from app.services.reconstruct_adapters.registry import get_reconstruct_adapter
 from app.services.storage_service import storage_service
 
 STAGE_OUTPUT_ROOT = DATA_DIR / "stage_outputs"
@@ -100,14 +105,46 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
     quality_artifact = next((artifact for artifact in artifacts if artifact.stage == "quality"), None)
     quality_score = float(quality_artifact.payload.get("quality_score", 0.0)) if quality_artifact else 0.0
 
-    estimated_vertices = max(12000, record.media_summary.photo_count * 2500 + record.media_summary.video_count * 5000)
+    selected_assets = _select_reconstruction_assets(quality_artifact.payload if quality_artifact else {})
+
+    adapter = get_reconstruct_adapter(settings.reconstruct_adapter)
+    adapter_input = ReconstructAdapterInput(
+        job_id=str(job_id),
+        selected_assets=selected_assets,
+        quality_score=quality_score,
+        profile={"age": record.age, "height_cm": record.height_cm},
+    )
+
+    tracemalloc.start()
+    start_ts = perf_counter()
+    adapter_output = adapter.run(adapter_input)
+    latency_ms = (perf_counter() - start_ts) * 1000.0
+    _, peak_bytes = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    storage_service.upload_bytes(
+        file_key=adapter_output.output_asset_key,
+        content_type=adapter_output.content_type,
+        payload=adapter_output.payload_bytes,
+    )
+
     payload = {
         "job_id": str(job_id),
-        "output_asset_key": f"{job_id}/outputs/reconstruction.glb",
-        "estimated_vertices": int(estimated_vertices + (quality_score * 35)),
+        "output_asset_key": adapter_output.output_asset_key,
+        "estimated_vertices": int(adapter_output.metadata.get("estimated_vertices", 0)),
         "quality_score_input": round(quality_score, 2),
-        "selected_assets": _select_reconstruction_assets(quality_artifact.payload if quality_artifact else {}),
-        "mode": "placeholder-reconstruction",
+        "selected_assets": selected_assets,
+        "mode": "adapter-driven",
+        "adapter": {
+            "name": adapter_output.adapter_name,
+            "version": adapter_output.adapter_version,
+        },
+        "runtime": {
+            "latency_ms": round(latency_ms, 2),
+            "peak_memory_kb": round(peak_bytes / 1024.0, 2),
+            "output_size_bytes": len(adapter_output.payload_bytes),
+            "content_type": adapter_output.content_type,
+        },
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     _write_stage_output(job_id, "reconstruct", payload)

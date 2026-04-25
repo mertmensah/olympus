@@ -51,6 +51,12 @@
 - `Pillow` for image metrics.
 - `imageio-ffmpeg` for local ffmpeg binary access and frame extraction.
 
+## Reconstruction Adapter
+
+- Configure via `OLYMPUS_RECONSTRUCT_ADAPTER` in `backend/.env`.
+- Current default: `mock_v1`.
+- Reconstruct artifact includes runtime metrics: latency, peak memory, and output size.
+
 ## Supabase Setup
 
 1. In Supabase, go to Settings -> API.

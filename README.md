@@ -16,6 +16,7 @@ Olympus enables users to upload photos, short videos, and voice clips, then gene
 - Uploaded asset tracking per job
 - Background pipeline worker scaffold for staged processing
 - Per-stage artifact outputs and quality/reconstruction placeholder metrics
+- Adapter-driven reconstruction hook with runtime telemetry
 - Initial upload-to-viewer workflow skeleton
 - GitHub Pages deployment workflow for frontend
 
