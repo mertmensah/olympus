@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createJob } from "../services/api";
+import { createJob, createUploadSession } from "../services/api";
 
 export default function UploadPage({ onJobCreated, onJumpToViewer }) {
   const [age, setAge] = useState(27);
@@ -8,6 +8,7 @@ export default function UploadPage({ onJobCreated, onJumpToViewer }) {
   const [videoCount, setVideoCount] = useState(2);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
+  const [sessionSummary, setSessionSummary] = useState(null);
 
   async function handleCreateJob(event) {
     event.preventDefault();
@@ -25,9 +26,16 @@ export default function UploadPage({ onJobCreated, onJumpToViewer }) {
       };
 
       const job = await createJob(payload);
-      onJobCreated(job);
+
+      const uploadSession = await createUploadSession(job.id);
+      setSessionSummary({
+        totalTargets: uploadSession.targets.length,
+        expiresInSeconds: uploadSession.expires_in_seconds,
+        previewTarget: uploadSession.targets[0] || null
+      });
+
+      onJobCreated({ ...job, uploadSession });
       setStatus("success");
-      onJumpToViewer();
     } catch (requestError) {
       setError(requestError.message || "Failed to create generation job.");
       setStatus("error");
@@ -80,6 +88,23 @@ export default function UploadPage({ onJobCreated, onJumpToViewer }) {
         <button className="primary" type="submit" disabled={status === "loading"}>
           {status === "loading" ? "Creating..." : "Create Job"}
         </button>
+
+        {sessionSummary ? (
+          <div className="status-box session-box">
+            <p>
+              <strong>Upload targets generated:</strong> {sessionSummary.totalTargets}
+            </p>
+            <p>
+              <strong>Session expiry:</strong> {sessionSummary.expiresInSeconds} seconds
+            </p>
+            <p>
+              <strong>First target key:</strong> {sessionSummary.previewTarget?.file_key || "n/a"}
+            </p>
+            <button type="button" className="primary" onClick={onJumpToViewer}>
+              Continue to Viewer
+            </button>
+          </div>
+        ) : null}
 
         {error ? <p className="error">{error}</p> : null}
       </form>

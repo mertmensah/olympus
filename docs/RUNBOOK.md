@@ -21,6 +21,8 @@
 - `GET /api/health`
 - `POST /api/jobs`
 - `GET /api/jobs/{job_id}`
+- `GET /api/jobs/{job_id}/record`
+- `POST /api/jobs/{job_id}/upload-session`
 
 ## GitHub Pages Deployment
 

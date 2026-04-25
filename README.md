@@ -10,7 +10,8 @@ Olympus enables users to upload photos, short videos, and voice clips, then gene
 
 - Frontend application scaffold (React + Vite)
 - Backend API scaffold (FastAPI)
-- Job creation and status endpoints
+- SQLite-backed job persistence and status endpoints
+- Upload-session contract endpoint for media targets
 - Initial upload-to-viewer workflow skeleton
 - GitHub Pages deployment workflow for frontend
 

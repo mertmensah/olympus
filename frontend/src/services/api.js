@@ -27,3 +27,13 @@ export function createJob(payload) {
 export function getJobStatus(jobId) {
   return request(`/api/jobs/${jobId}`);
 }
+
+export function getJobRecord(jobId) {
+  return request(`/api/jobs/${jobId}/record`);
+}
+
+export function createUploadSession(jobId) {
+  return request(`/api/jobs/${jobId}/upload-session`, {
+    method: "POST"
+  });
+}

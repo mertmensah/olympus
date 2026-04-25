@@ -140,6 +140,11 @@ input {
   max-width: 460px;
 }
 
+.session-box {
+  grid-column: 1 / -1;
+  max-width: 100%;
+}
+
 .error {
   color: #b91c1c;
   margin: 0.2rem 0 0;
