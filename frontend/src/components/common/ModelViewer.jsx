@@ -6,12 +6,17 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 export default function ModelViewer({ modelUrl, onStatusChange }) {
   const containerRef = useRef(null);
   const frameRef = useRef(null);
+  const statusRef = useRef(onStatusChange);
+
+  useEffect(() => {
+    statusRef.current = onStatusChange;
+  }, [onStatusChange]);
 
   useEffect(() => {
     if (!modelUrl || !containerRef.current) {
       return;
     }
-    onStatusChange?.({ level: "info", message: `Loading model from ${modelUrl}` });
+    statusRef.current?.({ level: "info", message: `Loading model from ${modelUrl}` });
 
     // Initialize Three.js scene
     const width = containerRef.current.clientWidth;
@@ -72,14 +77,33 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
         model.position.sub(center.multiplyScalar(scale));
         
         scene.add(model);
-        onStatusChange?.({
+
+        // Fit camera to model bounds and focus controls on centroid.
+        const fittedBox = new THREE.Box3().setFromObject(model);
+        const fittedCenter = fittedBox.getCenter(new THREE.Vector3());
+        const sphere = fittedBox.getBoundingSphere(new THREE.Sphere());
+        const radius = Math.max(sphere.radius, 0.25);
+        const distance = radius * 2.6;
+
+        camera.position.set(fittedCenter.x, fittedCenter.y + radius * 0.5, fittedCenter.z + distance);
+        camera.near = Math.max(0.01, radius / 100);
+        camera.far = Math.max(1000, distance * 20);
+        camera.lookAt(fittedCenter);
+        camera.updateProjectionMatrix();
+
+        controls.target.copy(fittedCenter);
+        controls.minDistance = radius * 0.8;
+        controls.maxDistance = radius * 12;
+        controls.update();
+
+        statusRef.current?.({
           level: "success",
-          message: `Model loaded: ${(size.x * size.y * size.z).toFixed(2)} scene volume`,
+          message: `Model loaded: radius=${radius.toFixed(2)} zoom-fit applied`,
         });
       },
       (progress) => {
         if (progress.total > 0) {
-          onStatusChange?.({
+          statusRef.current?.({
             level: "info",
             message: `Loading model: ${((progress.loaded / progress.total) * 100).toFixed(0)}%`,
           });
@@ -87,7 +111,7 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
       },
       (error) => {
         const msg = error?.message || String(error);
-        onStatusChange?.({ level: "error", message: `Model load failed: ${msg}` });
+        statusRef.current?.({ level: "error", message: `Model load failed: ${msg}` });
         console.error("Error loading model:", error);
       }
     );
@@ -129,7 +153,7 @@ export default function ModelViewer({ modelUrl, onStatusChange }) {
         containerRef.current.removeChild(renderer.domElement);
       }
     };
-  }, [modelUrl, onStatusChange]);
+  }, [modelUrl]);
 
   return (
     <div

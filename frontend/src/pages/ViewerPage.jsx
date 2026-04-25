@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getJobArtifacts, getJobAssets, getJobDebug, getJobStatus, getReconstructionFileUrl, startJobPipeline } from "../services/api";
 import ModelViewer from "../components/common/ModelViewer";
 
@@ -13,8 +13,20 @@ export default function ViewerPage({ activeJob }) {
   const [debugInfo, setDebugInfo] = useState(null);
 
   useEffect(() => {
-    setJob(activeJob);
+    if (!activeJob) {
+      return;
+    }
+    setJob((current) => {
+      if (!current || current.id !== activeJob.id) {
+        return activeJob;
+      }
+      return current;
+    });
   }, [activeJob]);
+
+  const handleViewerStatusChange = useCallback(({ level, message }) => {
+    setViewerStatus(`${level.toUpperCase()}: ${message}`);
+  }, []);
 
   useEffect(() => {
     if (!job?.id || job.status !== "processing") {
@@ -115,9 +127,7 @@ export default function ViewerPage({ activeJob }) {
         <div style={{ marginBottom: "2rem" }}>
           <ModelViewer
             modelUrl={modelUrl}
-            onStatusChange={({ level, message }) => {
-              setViewerStatus(`${level.toUpperCase()}: ${message}`);
-            }}
+            onStatusChange={handleViewerStatusChange}
           />
           <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#999" }}>
             Use mouse to rotate, scroll to zoom, right-click to pan
