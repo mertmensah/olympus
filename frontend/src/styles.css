@@ -1,0 +1,158 @@
+:root {
+  --bg: #f3f4f6;
+  --ink: #111827;
+  --ink-soft: #4b5563;
+  --brand: #0f766e;
+  --panel: #ffffff;
+  --line: #d1d5db;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  background: radial-gradient(circle at top right, #d1fae5, #f3f4f6 46%);
+  color: var(--ink);
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.85);
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.brand span {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tabs button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+.content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.hero,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1.3rem;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--brand);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.step-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.9rem;
+  background: #fff;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-size: 1rem;
+}
+
+.primary {
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.status-box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fff;
+  display: grid;
+  gap: 0.5rem;
+  max-width: 460px;
+}
+
+.error {
+  color: #b91c1c;
+  margin: 0.2rem 0 0;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+}
