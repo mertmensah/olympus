@@ -13,8 +13,9 @@
 1. `cd backend`
 2. `python -m venv .venv`
 3. `.venv\\Scripts\\activate`
-4. `pip install -r requirements.txt`
-5. `uvicorn app.main:app --reload`
+4. Copy `.env.example` to `.env` and fill Supabase values
+5. `pip install -r requirements.txt`
+6. `uvicorn app.main:app --reload`
 
 ## API Endpoints
 
@@ -33,6 +34,15 @@
 3. API returns tokenized upload targets.
 4. Frontend uploads each file directly using `PUT /api/uploads/{token}`.
 5. Uploaded assets are tracked via `GET /api/jobs/{job_id}/assets`.
+
+## Supabase Setup
+
+1. In Supabase, go to Settings -> API.
+2. Copy project URL and service role key.
+3. In Storage, create a private bucket named `olympus_media` or your selected bucket name.
+4. Put values in `backend/.env`.
+
+Never commit `backend/.env` or expose service role key in frontend code.
 
 ## GitHub Pages Deployment
 

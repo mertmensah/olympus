@@ -5,14 +5,12 @@ import hashlib
 import hmac
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from app.core.config import settings
-from app.services.database import DATA_DIR, database
-
-UPLOAD_ROOT = DATA_DIR / "uploads"
+from app.services.database import database
+from app.services.storage_service import storage_service
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -68,10 +66,8 @@ def store_uploaded_file(token_payload: dict[str, Any], body: bytes, content_type
         raise ValueError("Content type mismatch")
 
     file_key = token_payload["file_key"]
-    output_path = UPLOAD_ROOT / file_key
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(body)
+    storage_service.upload_bytes(file_key=file_key, content_type=content_type, payload=body)
 
     job_id = UUID(token_payload["job_id"])
-    database.mark_asset_uploaded(job_id=job_id, file_key=file_key, size_bytes=len(body), storage_path=str(output_path))
+    database.mark_asset_uploaded(job_id=job_id, file_key=file_key, size_bytes=len(body), storage_path=file_key)
     return file_key, len(body)

@@ -57,6 +57,8 @@ async def upload_file(token: str, request: Request) -> dict[str, str | int]:
         file_key, size_bytes = store_uploaded_file(payload, body, content_type)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
     return {"status": "uploaded", "file_key": file_key, "size_bytes": size_bytes}
 

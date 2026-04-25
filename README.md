@@ -12,6 +12,7 @@ Olympus enables users to upload photos, short videos, and voice clips, then gene
 - Backend API scaffold (FastAPI)
 - SQLite-backed job persistence and status endpoints
 - Tokenized upload-session contract and direct media upload endpoint
+- Supabase Storage integration for media persistence
 - Uploaded asset tracking per job
 - Initial upload-to-viewer workflow skeleton
 - GitHub Pages deployment workflow for frontend
