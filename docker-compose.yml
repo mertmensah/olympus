@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Supabase Configuration
+      SUPABASE_URL: "${SUPABASE_URL}"
+      SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY}"
+      SUPABASE_BUCKET_NAME: "olympus_media"
+      
+      # Upload Configuration
+      OLYMPUS_UPLOAD_TOKEN_SECRET: "${OLYMPUS_UPLOAD_TOKEN_SECRET:-dev-secret-change-me}"
+      OLYMPUS_UPLOAD_TOKEN_TTL: "3600"
+      
+      # Reconstruction Adapter Configuration
+      OLYMPUS_RECONSTRUCT_ADAPTER: "${OLYMPUS_RECONSTRUCT_ADAPTER:-mock_v1}"
+      
+      # HuggingFace API Configuration (optional)
+      OLYMPUS_HF_API_URL: "${OLYMPUS_HF_API_URL:-}"
+      OLYMPUS_HF_API_TOKEN: "${OLYMPUS_HF_API_TOKEN:-}"
+      OLYMPUS_HF_API_TIMEOUT: "30"
+      
+      # API Configuration
+      OLYMPUS_API_BASE_URL: "${OLYMPUS_API_BASE_URL:-http://localhost:8000}"
+    
+    volumes:
+      - ./backend/data:/app/data
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    
+    networks:
+      - olympus-network
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: "http://localhost:8000"
+    command: >
+      sh -c "npm install && npm run dev"
+    networks:
+      - olympus-network
+    depends_on:
+      - backend
+
+networks:
+  olympus-network:
+    driver: bridge
+
+volumes:
+  backend_data:
+    driver: local
