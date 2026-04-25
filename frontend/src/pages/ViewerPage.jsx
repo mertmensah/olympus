@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { getJobArtifacts, getJobAssets, getJobStatus, startJobPipeline } from "../services/api";
+import { getJobArtifacts, getJobAssets, getJobDebug, getJobStatus, getReconstructionFileUrl, startJobPipeline } from "../services/api";
 import ModelViewer from "../components/common/ModelViewer";
-import { getSupabaseStorageUrl } from "../supabase";
 
 export default function ViewerPage({ activeJob }) {
   const [job, setJob] = useState(activeJob);
@@ -10,6 +9,8 @@ export default function ViewerPage({ activeJob }) {
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const [modelUrl, setModelUrl] = useState(null);
+  const [viewerStatus, setViewerStatus] = useState("Waiting for reconstruction output.");
+  const [debugInfo, setDebugInfo] = useState(null);
 
   useEffect(() => {
     setJob(activeJob);
@@ -46,10 +47,22 @@ export default function ViewerPage({ activeJob }) {
       const reconstructArtifact = stageArtifacts.find(a => a.stage === "reconstruct");
       if (reconstructArtifact && reconstructArtifact.payload) {
         const fileKey = reconstructArtifact.payload.output_asset_key;
+        const contentType = reconstructArtifact.payload?.runtime?.content_type;
         if (fileKey) {
-          const supabaseUrl = getSupabaseStorageUrl(fileKey);
-          setModelUrl(supabaseUrl);
+          if (contentType === "model/gltf-binary") {
+            setModelUrl(getReconstructionFileUrl(job.id));
+            setViewerStatus(`Reconstruction artifact found: ${fileKey}`);
+          } else {
+            setModelUrl(null);
+            setViewerStatus(
+              `Reconstruction output is ${contentType || "unknown"}, expected model/gltf-binary. Run a fresh job after backend restart.`
+            );
+          }
+        } else {
+          setViewerStatus("Reconstruct artifact exists, but output key is missing.");
         }
+      } else {
+        setViewerStatus("Reconstruct artifact not available yet.");
       }
       
       setError("");
@@ -76,15 +89,41 @@ export default function ViewerPage({ activeJob }) {
     }
   }
 
+  async function handleRunDebugTrail() {
+    if (!job?.id) {
+      return;
+    }
+    try {
+      const payload = await getJobDebug(job.id);
+      setDebugInfo(payload);
+      const storageOk = payload?.storage_probe?.ok;
+      if (storageOk) {
+        setViewerStatus("Debug trail: storage probe succeeded.");
+      } else {
+        setViewerStatus(`Debug trail: ${payload?.storage_probe?.error || "storage probe failed"}`);
+      }
+    } catch (requestError) {
+      setError(requestError.message || "Unable to run debug trail.");
+    }
+  }
+
   return (
     <section className="panel">
       <h2>3D Output Viewer</h2>
       
       {modelUrl ? (
         <div style={{ marginBottom: "2rem" }}>
-          <ModelViewer modelUrl={modelUrl} />
+          <ModelViewer
+            modelUrl={modelUrl}
+            onStatusChange={({ level, message }) => {
+              setViewerStatus(`${level.toUpperCase()}: ${message}`);
+            }}
+          />
           <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#999" }}>
             Use mouse to rotate, scroll to zoom, right-click to pan
+          </p>
+          <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#ccc" }}>
+            Viewer status: {viewerStatus}
           </p>
         </div>
       ) : (
@@ -110,6 +149,10 @@ export default function ViewerPage({ activeJob }) {
           </p>
           <button className="primary" onClick={refreshStatus}>
             Refresh Status
+          </button>
+
+          <button className="primary" onClick={handleRunDebugTrail}>
+            Run Debug Trail
           </button>
 
           <button
@@ -148,6 +191,12 @@ export default function ViewerPage({ activeJob }) {
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {debugInfo ? (
+            <pre style={{ whiteSpace: "pre-wrap", marginTop: "1rem", fontSize: "0.85rem" }}>
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
           ) : null}
         </div>
       )}

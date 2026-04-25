@@ -64,6 +64,14 @@ export function getJobArtifacts(jobId) {
   return request(`/api/jobs/${jobId}/artifacts`);
 }
 
+export function getJobDebug(jobId) {
+  return request(`/api/jobs/${jobId}/debug`);
+}
+
+export function getReconstructionFileUrl(jobId) {
+  return `${API_BASE}/api/jobs/${jobId}/reconstruction`;
+}
+
 export function startJobPipeline(jobId) {
   return request(`/api/jobs/${jobId}/start`, {
     method: "POST"

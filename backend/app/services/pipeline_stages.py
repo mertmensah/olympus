@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import subprocess
 import tempfile
 import tracemalloc
@@ -22,6 +23,7 @@ from app.services.reconstruct_adapters.registry import get_reconstruct_adapter
 from app.services.storage_service import storage_service
 
 STAGE_OUTPUT_ROOT = DATA_DIR / "stage_outputs"
+logger = logging.getLogger(__name__)
 
 
 def _write_stage_output(job_id: UUID, stage: str, payload: dict) -> None:
@@ -115,6 +117,16 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
         asset_count=len(selected_assets)
     )
     selection_metadata = selector.get_selection_metadata(quality_score, len(selected_assets))
+    logger.info(
+        "Reconstruct selection",
+        extra={
+            "job_id": str(job_id),
+            "adapter": adapter_name,
+            "quality_score": round(quality_score, 2),
+            "asset_count": len(selected_assets),
+            "strategy": selection_metadata.get("strategy"),
+        },
+    )
 
     adapter_input = ReconstructAdapterInput(
         job_id=str(job_id),
@@ -134,6 +146,16 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
         file_key=adapter_output.output_asset_key,
         content_type=adapter_output.content_type,
         payload=adapter_output.payload_bytes,
+    )
+    logger.info(
+        "Reconstruct output uploaded",
+        extra={
+            "job_id": str(job_id),
+            "file_key": adapter_output.output_asset_key,
+            "content_type": adapter_output.content_type,
+            "bytes": len(adapter_output.payload_bytes),
+            "adapter": adapter_output.adapter_name,
+        },
     )
 
     payload = {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import logging
 from threading import Lock
 from uuid import UUID
 
@@ -32,27 +33,37 @@ class PipelineWorker:
     def _run_pipeline(self, job_id: UUID) -> None:
         current_stage = "ingest"
         try:
+            logger.info("Pipeline started", extra={"job_id": str(job_id)})
             self._set_state(job_id, "processing", "ingest")
             database.save_job_artifact(job_id, "ingest", run_ingest_stage(job_id))
+            logger.info("Pipeline stage completed", extra={"job_id": str(job_id), "stage": "ingest"})
 
             current_stage = "quality"
             self._set_state(job_id, "processing", "quality")
             database.save_job_artifact(job_id, "quality", run_quality_stage(job_id))
+            logger.info("Pipeline stage completed", extra={"job_id": str(job_id), "stage": "quality"})
 
             current_stage = "reconstruct"
             self._set_state(job_id, "processing", "reconstruct")
             database.save_job_artifact(job_id, "reconstruct", run_reconstruct_stage(job_id))
+            logger.info("Pipeline stage completed", extra={"job_id": str(job_id), "stage": "reconstruct"})
 
             current_stage = "postprocess"
             self._set_state(job_id, "processing", "postprocess")
             database.save_job_artifact(job_id, "postprocess", run_postprocess_stage(job_id))
+            logger.info("Pipeline stage completed", extra={"job_id": str(job_id), "stage": "postprocess"})
 
             current_stage = "deliver"
             database.save_job_artifact(job_id, "deliver", run_deliver_stage(job_id))
 
             self._set_state(job_id, "completed", "deliver")
+            logger.info("Pipeline completed", extra={"job_id": str(job_id), "stage": "deliver"})
         except Exception:
             self._set_state(job_id, "failed", current_stage)
+            logger.exception(
+                "Pipeline failed",
+                extra={"job_id": str(job_id), "stage": current_stage},
+            )
         finally:
             with self._lock:
                 self._active_jobs.discard(job_id)
@@ -62,4 +73,5 @@ class PipelineWorker:
         database.update_job_state(job_id=job_id, status=status, stage=stage)
 
 
+logger = logging.getLogger(__name__)
 pipeline_worker = PipelineWorker()
