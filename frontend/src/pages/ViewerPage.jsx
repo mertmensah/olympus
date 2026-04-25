@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { getJobArtifacts, getJobAssets, getJobStatus, startJobPipeline } from "../services/api";
+import ModelViewer from "../components/common/ModelViewer";
+import { getSupabaseStorageUrl } from "../supabase";
 
 export default function ViewerPage({ activeJob }) {
   const [job, setJob] = useState(activeJob);
@@ -7,6 +9,7 @@ export default function ViewerPage({ activeJob }) {
   const [artifacts, setArtifacts] = useState([]);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [modelUrl, setModelUrl] = useState(null);
 
   useEffect(() => {
     setJob(activeJob);
@@ -38,6 +41,17 @@ export default function ViewerPage({ activeJob }) {
       setJob(latest);
       setAssets(uploadedAssets);
       setArtifacts(stageArtifacts);
+      
+      // Extract reconstruct artifact and get model URL
+      const reconstructArtifact = stageArtifacts.find(a => a.stage === "reconstruct");
+      if (reconstructArtifact && reconstructArtifact.payload) {
+        const fileKey = reconstructArtifact.payload.output_asset_key;
+        if (fileKey) {
+          const supabaseUrl = getSupabaseStorageUrl(fileKey);
+          setModelUrl(supabaseUrl);
+        }
+      }
+      
       setError("");
     } catch (requestError) {
       setError(requestError.message || "Unable to fetch job status.");
@@ -65,10 +79,21 @@ export default function ViewerPage({ activeJob }) {
   return (
     <section className="panel">
       <h2>3D Output Viewer</h2>
-      <p>
-        This page will host the interactive Three.js viewer once generation assets are produced by the AI worker
-        pipeline.
-      </p>
+      
+      {modelUrl ? (
+        <div style={{ marginBottom: "2rem" }}>
+          <ModelViewer modelUrl={modelUrl} />
+          <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#999" }}>
+            Use mouse to rotate, scroll to zoom, right-click to pan
+          </p>
+        </div>
+      ) : (
+        <p className="muted">
+          {job?.status === "completed" && job?.stage === "deliver"
+            ? "3D model generation complete. Model was reconstructed but is loading..."
+            : "Upload assets and start generation to see the 3D model here."}
+        </p>
+      )}
 
       {!job ? (
         <p className="muted">No active job yet. Create a job in Upload first.</p>
