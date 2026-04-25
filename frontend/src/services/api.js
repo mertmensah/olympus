@@ -32,8 +32,30 @@ export function getJobRecord(jobId) {
   return request(`/api/jobs/${jobId}/record`);
 }
 
-export function createUploadSession(jobId) {
+export function createUploadSession(jobId, files) {
   return request(`/api/jobs/${jobId}/upload-session`, {
-    method: "POST"
+    method: "POST",
+    body: JSON.stringify({ files })
   });
+}
+
+export async function uploadToTarget(target, file) {
+  const response = await fetch(target.upload_url, {
+    method: target.method || "PUT",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream"
+    },
+    body: file
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Upload failed for ${file.name}`);
+  }
+
+  return response.json();
+}
+
+export function getJobAssets(jobId) {
+  return request(`/api/jobs/${jobId}/assets`);
 }

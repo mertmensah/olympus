@@ -30,12 +30,34 @@ class JobRecord(JobStatus):
 
 
 class UploadTarget(BaseModel):
+    client_id: str
     file_key: str
-    content_type: Literal["image/jpeg", "image/png", "video/mp4"]
+    content_type: str
+    method: Literal["PUT"] = "PUT"
     upload_url: str
+
+
+class UploadFileDescriptor(BaseModel):
+    client_id: str
+    kind: Literal["photo", "video", "audio"]
+    file_name: str
+    content_type: str
+    size_bytes: int = Field(ge=1)
+
+
+class UploadSessionRequest(BaseModel):
+    files: list[UploadFileDescriptor] = Field(min_length=1)
 
 
 class UploadSessionResponse(BaseModel):
     job_id: UUID
     expires_in_seconds: int
     targets: list[UploadTarget]
+
+
+class UploadedAsset(BaseModel):
+    file_key: str
+    content_type: str
+    size_bytes: int
+    status: Literal["pending", "uploaded"]
+    uploaded_at: datetime | None = None

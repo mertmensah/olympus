@@ -145,6 +145,24 @@ input {
   max-width: 100%;
 }
 
+.file-field small {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.asset-list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.asset-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
 .error {
   color: #b91c1c;
   margin: 0.2rem 0 0;

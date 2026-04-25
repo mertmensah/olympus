@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
-from app.models.schemas import JobCreateRequest, JobRecord, JobStatus, MediaSummary
+from app.models.schemas import JobCreateRequest, JobRecord, JobStatus, MediaSummary, UploadedAsset
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 DB_PATH = DATA_DIR / "olympus.db"
@@ -30,6 +30,21 @@ class Database:
                 status TEXT NOT NULL,
                 stage TEXT NOT NULL,
                 created_at TEXT NOT NULL
+            )
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id TEXT NOT NULL,
+                file_key TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                size_bytes INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                uploaded_at TEXT,
+                storage_path TEXT,
+                UNIQUE(job_id, file_key)
             )
             """
         )
@@ -86,6 +101,52 @@ class Database:
             stage=row["stage"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )
+
+    def reserve_asset(self, job_id: UUID, file_key: str, content_type: str, size_bytes: int) -> None:
+        self._connection.execute(
+            """
+            INSERT OR REPLACE INTO assets (job_id, file_key, content_type, size_bytes, status, uploaded_at, storage_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (str(job_id), file_key, content_type, size_bytes, "pending", None, None),
+        )
+        self._connection.commit()
+
+    def mark_asset_uploaded(self, job_id: UUID, file_key: str, size_bytes: int, storage_path: str) -> None:
+        uploaded_at = datetime.now(timezone.utc).isoformat()
+        self._connection.execute(
+            """
+            UPDATE assets
+            SET size_bytes = ?, status = ?, uploaded_at = ?, storage_path = ?
+            WHERE job_id = ? AND file_key = ?
+            """,
+            (size_bytes, "uploaded", uploaded_at, storage_path, str(job_id), file_key),
+        )
+        self._connection.commit()
+
+    def list_assets(self, job_id: UUID) -> list[UploadedAsset]:
+        rows = self._connection.execute(
+            """
+            SELECT file_key, content_type, size_bytes, status, uploaded_at
+            FROM assets
+            WHERE job_id = ?
+            ORDER BY id ASC
+            """,
+            (str(job_id),),
+        ).fetchall()
+
+        assets: list[UploadedAsset] = []
+        for row in rows:
+            assets.append(
+                UploadedAsset(
+                    file_key=row["file_key"],
+                    content_type=row["content_type"],
+                    size_bytes=row["size_bytes"],
+                    status=row["status"],
+                    uploaded_at=datetime.fromisoformat(row["uploaded_at"]) if row["uploaded_at"] else None,
+                )
+            )
+        return assets
 
 
 database = Database()

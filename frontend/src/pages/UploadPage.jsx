@@ -1,14 +1,30 @@
 import { useState } from "react";
-import { createJob, createUploadSession } from "../services/api";
+import { createJob, createUploadSession, uploadToTarget } from "../services/api";
+
+function buildDescriptors(files, kind) {
+  return files.map((file, index) => ({
+    client_id: `${kind}-${index}`,
+    kind,
+    file_name: file.name,
+    content_type: file.type || "application/octet-stream",
+    size_bytes: file.size
+  }));
+}
 
 export default function UploadPage({ onJobCreated, onJumpToViewer }) {
   const [age, setAge] = useState(27);
   const [heightCm, setHeightCm] = useState(175);
-  const [photoCount, setPhotoCount] = useState(20);
-  const [videoCount, setVideoCount] = useState(2);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
   const [sessionSummary, setSessionSummary] = useState(null);
+  const [photoFiles, setPhotoFiles] = useState([]);
+  const [videoFiles, setVideoFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  function mapFiles(event, setter) {
+    const files = Array.from(event.target.files || []);
+    setter(files);
+  }
 
   async function handleCreateJob(event) {
     event.preventDefault();
@@ -16,22 +32,42 @@ export default function UploadPage({ onJobCreated, onJumpToViewer }) {
     setError("");
 
     try {
+      if (photoFiles.length === 0) {
+        throw new Error("Select at least one photo to proceed.");
+      }
+
       const payload = {
         age,
         height_cm: heightCm,
         media_summary: {
-          photo_count: photoCount,
-          video_count: videoCount
+          photo_count: photoFiles.length,
+          video_count: videoFiles.length
         }
       };
 
       const job = await createJob(payload);
 
-      const uploadSession = await createUploadSession(job.id);
+      const descriptors = [...buildDescriptors(photoFiles, "photo"), ...buildDescriptors(videoFiles, "video")];
+
+      const uploadSession = await createUploadSession(job.id, descriptors);
+      const fileByClientId = new Map(descriptors.map((descriptor, index) => [descriptor.client_id, [...photoFiles, ...videoFiles][index]]));
+
+      let uploaded = 0;
+      for (const target of uploadSession.targets) {
+        const file = fileByClientId.get(target.client_id);
+        if (!file) {
+          continue;
+        }
+        await uploadToTarget(target, file);
+        uploaded += 1;
+        setUploadProgress(Math.round((uploaded / uploadSession.targets.length) * 100));
+      }
+
       setSessionSummary({
         totalTargets: uploadSession.targets.length,
         expiresInSeconds: uploadSession.expires_in_seconds,
-        previewTarget: uploadSession.targets[0] || null
+        previewTarget: uploadSession.targets[0] || null,
+        uploadedCount: uploaded
       });
 
       onJobCreated({ ...job, uploadSession });
@@ -63,36 +99,31 @@ export default function UploadPage({ onJobCreated, onJumpToViewer }) {
           />
         </label>
 
-        <label>
-          Planned photos
-          <input
-            type="number"
-            min="10"
-            max="60"
-            value={photoCount}
-            onChange={(e) => setPhotoCount(Number(e.target.value))}
-          />
+        <label className="file-field">
+          Photo files
+          <input type="file" accept="image/*" multiple onChange={(e) => mapFiles(e, setPhotoFiles)} />
+          <small>{photoFiles.length} selected</small>
         </label>
 
-        <label>
-          Planned videos
-          <input
-            type="number"
-            min="1"
-            max="10"
-            value={videoCount}
-            onChange={(e) => setVideoCount(Number(e.target.value))}
-          />
+        <label className="file-field">
+          Video files
+          <input type="file" accept="video/*" multiple onChange={(e) => mapFiles(e, setVideoFiles)} />
+          <small>{videoFiles.length} selected</small>
         </label>
 
         <button className="primary" type="submit" disabled={status === "loading"}>
           {status === "loading" ? "Creating..." : "Create Job"}
         </button>
 
+        {status === "loading" ? <p className="muted">Upload progress: {uploadProgress}%</p> : null}
+
         {sessionSummary ? (
           <div className="status-box session-box">
             <p>
               <strong>Upload targets generated:</strong> {sessionSummary.totalTargets}
+            </p>
+            <p>
+              <strong>Files uploaded:</strong> {sessionSummary.uploadedCount}
             </p>
             <p>
               <strong>Session expiry:</strong> {sessionSummary.expiresInSeconds} seconds

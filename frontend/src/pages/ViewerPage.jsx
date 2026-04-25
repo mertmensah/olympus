@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { getJobStatus } from "../services/api";
+import { getJobAssets, getJobStatus } from "../services/api";
 
 export default function ViewerPage({ activeJob }) {
   const [job, setJob] = useState(activeJob);
+  const [assets, setAssets] = useState([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -15,8 +16,9 @@ export default function ViewerPage({ activeJob }) {
     }
 
     try {
-      const latest = await getJobStatus(job.id);
+      const [latest, uploadedAssets] = await Promise.all([getJobStatus(job.id), getJobAssets(job.id)]);
       setJob(latest);
+      setAssets(uploadedAssets);
       setError("");
     } catch (requestError) {
       setError(requestError.message || "Unable to fetch job status.");
@@ -47,6 +49,21 @@ export default function ViewerPage({ activeJob }) {
           <button className="primary" onClick={refreshStatus}>
             Refresh Status
           </button>
+
+          <p>
+            <strong>Uploaded assets:</strong> {assets.length}
+          </p>
+
+          {assets.length ? (
+            <ul className="asset-list">
+              {assets.map((asset) => (
+                <li key={asset.file_key}>
+                  <span>{asset.file_key}</span>
+                  <span>{asset.status}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       )}
 

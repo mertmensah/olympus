@@ -1,7 +1,9 @@
 from uuid import UUID, uuid4
 
-from app.models.schemas import JobCreateRequest, JobRecord, JobStatus, UploadSessionResponse, UploadTarget
+from app.core.config import settings
+from app.models.schemas import JobCreateRequest, JobRecord, JobStatus, UploadSessionRequest, UploadSessionResponse, UploadTarget
 from app.services.database import database
+from app.services.upload_tokens import create_upload_token
 
 
 class JobStore:
@@ -15,34 +17,46 @@ class JobStore:
     def get_record(self, job_id: UUID) -> JobRecord | None:
         return database.get_job_record(job_id)
 
-    def create_upload_session(self, job_id: UUID) -> UploadSessionResponse | None:
+    def create_upload_session(self, job_id: UUID, payload: UploadSessionRequest) -> UploadSessionResponse | None:
         record = self.get_record(job_id)
         if record is None:
             return None
 
         targets: list[UploadTarget] = []
+        counters = {"photo": 0, "video": 0, "audio": 0}
 
-        for index in range(record.media_summary.photo_count):
-            file_key = f"{job_id}/photos/photo-{index + 1:02d}.jpg"
+        for file in payload.files:
+            counters[file.kind] += 1
+            extension = self._extension_from_content_type(file.content_type)
+            file_key = f"{job_id}/{file.kind}s/{file.kind}-{counters[file.kind]:02d}.{extension}"
+            token = create_upload_token(job_id=job_id, file_key=file_key, content_type=file.content_type)
+            database.reserve_asset(job_id=job_id, file_key=file_key, content_type=file.content_type, size_bytes=file.size_bytes)
+
             targets.append(
                 UploadTarget(
+                    client_id=file.client_id,
                     file_key=file_key,
-                    content_type="image/jpeg",
-                    upload_url=f"https://storage.olympus.local/upload/{file_key}?token=dev",
+                    content_type=file.content_type,
+                    method="PUT",
+                    upload_url=f"{settings.api_public_base_url}/api/uploads/{token}",
                 )
             )
 
-        for index in range(record.media_summary.video_count):
-            file_key = f"{job_id}/videos/video-{index + 1:02d}.mp4"
-            targets.append(
-                UploadTarget(
-                    file_key=file_key,
-                    content_type="video/mp4",
-                    upload_url=f"https://storage.olympus.local/upload/{file_key}?token=dev",
-                )
-            )
+        return UploadSessionResponse(job_id=job_id, expires_in_seconds=settings.upload_token_ttl_seconds, targets=targets)
 
-        return UploadSessionResponse(job_id=job_id, expires_in_seconds=3600, targets=targets)
+    def list_assets(self, job_id: UUID):
+        return database.list_assets(job_id)
+
+    @staticmethod
+    def _extension_from_content_type(content_type: str) -> str:
+        mapping = {
+            "image/jpeg": "jpg",
+            "image/png": "png",
+            "video/mp4": "mp4",
+            "audio/wav": "wav",
+            "audio/mpeg": "mp3",
+        }
+        return mapping.get(content_type, "bin")
 
 
 job_store = JobStore()
