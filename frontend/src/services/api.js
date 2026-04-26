@@ -68,6 +68,10 @@ export function getJobDebug(jobId) {
   return request(`/api/jobs/${jobId}/debug`);
 }
 
+export function getJobInputFeedback(jobId) {
+  return request(`/api/jobs/${jobId}/input-feedback`);
+}
+
 export function getReconstructionFileUrl(jobId) {
   return `${API_BASE}/api/jobs/${jobId}/reconstruction`;
 }

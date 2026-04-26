@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { getJobArtifacts, getJobAssets, getJobDebug, getJobStatus, getReconstructionFileUrl, startJobPipeline } from "../services/api";
+import {
+  getJobArtifacts,
+  getJobAssets,
+  getJobDebug,
+  getJobInputFeedback,
+  getJobStatus,
+  getReconstructionFileUrl,
+  startJobPipeline
+} from "../services/api";
 import ModelViewer from "../components/common/ModelViewer";
 
 export default function ViewerPage({ activeJob }) {
@@ -12,6 +20,7 @@ export default function ViewerPage({ activeJob }) {
   const [modelLoaded, setModelLoaded] = useState(false);
   const [viewerStatus, setViewerStatus] = useState("Waiting for reconstruction output.");
   const [debugInfo, setDebugInfo] = useState(null);
+  const [inputFeedback, setInputFeedback] = useState(null);
 
   useEffect(() => {
     if (!activeJob) {
@@ -64,6 +73,7 @@ export default function ViewerPage({ activeJob }) {
       
       // Extract reconstruct artifact and get model URL
       const reconstructArtifact = stageArtifacts.find(a => a.stage === "reconstruct");
+      const qualityArtifact = stageArtifacts.find(a => a.stage === "quality");
       if (reconstructArtifact && reconstructArtifact.payload) {
         const fileKey = reconstructArtifact.payload.output_asset_key;
         const contentType = reconstructArtifact.payload?.runtime?.content_type;
@@ -88,6 +98,17 @@ export default function ViewerPage({ activeJob }) {
       } else {
         setModelLoaded(false);
         setViewerStatus("Reconstruct artifact not available yet.");
+      }
+
+      if (qualityArtifact) {
+        try {
+          const feedback = await getJobInputFeedback(job.id);
+          setInputFeedback(feedback);
+        } catch {
+          setInputFeedback(null);
+        }
+      } else {
+        setInputFeedback(null);
       }
       
       setError("");
@@ -220,6 +241,83 @@ export default function ViewerPage({ activeJob }) {
             <pre style={{ whiteSpace: "pre-wrap", marginTop: "1rem", fontSize: "0.85rem" }}>
               {JSON.stringify(debugInfo, null, 2)}
             </pre>
+          ) : null}
+
+          {inputFeedback ? (
+            <section className="input-feedback-section">
+              <h3>Input Feedback</h3>
+              <p>
+                <strong>Readiness:</strong> {inputFeedback.summary?.overall_readiness || "n/a"}
+              </p>
+              <p>
+                <strong>Rejected/Not Valuable:</strong>{" "}
+                {inputFeedback.summary?.inputs_rejected_or_not_valuable ?? 0} / {inputFeedback.summary?.inputs_total ?? 0}
+              </p>
+
+              {Array.isArray(inputFeedback.global_recommendations) && inputFeedback.global_recommendations.length ? (
+                <div className="feedback-global">
+                  <strong>Global recommendations</strong>
+                  <ul className="feedback-list">
+                    {inputFeedback.global_recommendations.map((tip, idx) => (
+                      <li key={`global-${idx}`}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {Array.isArray(inputFeedback.per_input) && inputFeedback.per_input.length ? (
+                <div className="feedback-grid">
+                  {inputFeedback.per_input.map((item) => (
+                    <article className="feedback-card" key={item.file_key}>
+                      <p className="feedback-key"><strong>File:</strong> {item.file_key}</p>
+                      <p>
+                        <strong>Value:</strong> <span className={`value-badge value-${item.value_level}`}>{item.value_level}</span>
+                      </p>
+                      <p>
+                        <strong>Used in reconstruction:</strong> {item.used_for_reconstruction ? "yes" : "no"}
+                      </p>
+
+                      {item.rejection_reason ? (
+                        <p className="error"><strong>Reason:</strong> {item.rejection_reason}</p>
+                      ) : null}
+
+                      {Array.isArray(item.inferred) && item.inferred.length ? (
+                        <div>
+                          <strong>Model inferred</strong>
+                          <ul className="feedback-list">
+                            {item.inferred.map((value, idx) => (
+                              <li key={`inferred-${item.file_key}-${idx}`}>{value}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {Array.isArray(item.could_not_infer) && item.could_not_infer.length ? (
+                        <div>
+                          <strong>Could not infer</strong>
+                          <ul className="feedback-list">
+                            {item.could_not_infer.map((value, idx) => (
+                              <li key={`missing-${item.file_key}-${idx}`}>{value}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {Array.isArray(item.recommendations) && item.recommendations.length ? (
+                        <div>
+                          <strong>How to improve this input</strong>
+                          <ul className="feedback-list">
+                            {item.recommendations.map((value, idx) => (
+                              <li key={`tip-${item.file_key}-${idx}`}>{value}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+            </section>
           ) : null}
         </div>
       )}

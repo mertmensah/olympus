@@ -229,6 +229,69 @@ input {
   color: var(--ink-soft);
 }
 
+.input-feedback-section {
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.feedback-global {
+  margin-top: 0.6rem;
+}
+
+.feedback-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.8rem;
+}
+
+.feedback-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #fff;
+}
+
+.feedback-key {
+  word-break: break-word;
+}
+
+.feedback-list {
+  margin: 0.35rem 0 0.5rem;
+  padding-left: 1rem;
+}
+
+.value-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.value-high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.value-medium {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
+.value-low {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.value-not_valuable,
+.value-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 @media (max-width: 760px) {
   .topbar {
     flex-direction: column;
