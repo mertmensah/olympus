@@ -89,18 +89,26 @@ def extract_face_signals(asset_keys: list[str]) -> dict:
     """
     image_keys = [key for key in asset_keys if "/photos/" in key][:_MAX_FACE_IMAGES]
     if not image_keys:
-        return {"asset_count": 0, "signals": {}, "samples": []}
+        return {"asset_count": 0, "signals": {}, "samples": [], "per_input": []}
 
     samples: list[dict[str, float]] = []
+    per_input: list[dict] = []
     for key in image_keys:
         try:
             blob = storage_service.download_bytes(key)
-            samples.append(_single_image_face_signals(blob))
+            signal_set = _single_image_face_signals(blob)
+            samples.append(signal_set)
+            per_input.append(
+                {
+                    "file_key": key,
+                    "signals": signal_set,
+                }
+            )
         except Exception:
             continue
 
     if not samples:
-        return {"asset_count": 0, "signals": {}, "samples": []}
+        return {"asset_count": 0, "signals": {}, "samples": [], "per_input": []}
 
     keys = samples[0].keys()
     aggregated = {k: round(mean(float(sample[k]) for sample in samples), 4) for k in keys}
@@ -109,4 +117,5 @@ def extract_face_signals(asset_keys: list[str]) -> dict:
         "asset_count": len(samples),
         "signals": aggregated,
         "samples": samples,
+        "per_input": per_input,
     }

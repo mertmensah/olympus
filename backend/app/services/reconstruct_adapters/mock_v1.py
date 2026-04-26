@@ -15,17 +15,23 @@ from app.services.reconstruct_adapters.base import (
 
 class MockReconstructAdapterV1(ReconstructAdapter):
     name = "mock_v1"
-    version = "1.1.0"
+    version = "1.2.0"
 
     def run(self, model_input: ReconstructAdapterInput) -> ReconstructAdapterOutput:
         """Generate a procedural 3D head mesh scaled by quality score."""
         face_signals = model_input.profile.get("face_signals", {}) if isinstance(model_input.profile, dict) else {}
+        per_input_signals = (
+            model_input.profile.get("per_input_face_signals", [])
+            if isinstance(model_input.profile, dict)
+            else []
+        )
         
-        # Generate mesh based on quality score
+        # Start from a stable human-head prior and iteratively refine per input.
         mesh = self._generate_head_mesh(
             quality_score=model_input.quality_score,
             height_cm=model_input.profile.get("height_cm", 175),
             face_signals=face_signals,
+            per_input_signals=per_input_signals,
         )
         
         # Export to GLB
@@ -45,10 +51,18 @@ class MockReconstructAdapterV1(ReconstructAdapter):
                 "quality_score": model_input.quality_score,
                 "face_signals_used": bool(face_signals),
                 "generator_profile": "human_head_v2",
+                "iteration_mode": "per_input_refinement",
+                "iterations_applied": len(per_input_signals),
             },
         )
 
-    def _generate_head_mesh(self, quality_score: float, height_cm: float, face_signals: dict) -> trimesh.Trimesh:
+    def _generate_head_mesh(
+        self,
+        quality_score: float,
+        height_cm: float,
+        face_signals: dict,
+        per_input_signals: list[dict],
+    ) -> trimesh.Trimesh:
         """Generate a stable human head/bust mesh guided by facial signals."""
         q = max(0.0, min(1.0, float(quality_score)))
         scale = 0.85 + (q * 0.45)
@@ -122,12 +136,55 @@ class MockReconstructAdapterV1(ReconstructAdapter):
         
         # Combine meshes
         combined = trimesh.util.concatenate([cranium, jaw, nose, left_ear, right_ear, neck, bust])
+
+        # Iteratively refine the same mesh after each input signal set.
+        combined = self._apply_iterative_refinement(combined, scale, per_input_signals)
         
         # Scale by height (normalize to ~175cm)
         height_scale = height_cm / 175.0
         combined.apply_scale(height_scale)
         
         return combined
+
+    def _apply_iterative_refinement(self, mesh: trimesh.Trimesh, scale: float, per_input_signals: list[dict]) -> trimesh.Trimesh:
+        if not per_input_signals:
+            return mesh
+
+        verts = mesh.vertices.copy()
+        total_steps = max(1, len(per_input_signals))
+
+        for idx, signal_item in enumerate(per_input_signals):
+            signals = signal_item.get("signals", {}) if isinstance(signal_item, dict) else {}
+            symmetry = float(np.clip(signals.get("symmetry_score", 0.75), 0.55, 0.98))
+            eye_contrast = float(np.clip(signals.get("eye_contrast", 0.12), 0.03, 0.28))
+            nose_bridge = float(np.clip(signals.get("nose_bridge_contrast", 0.1), 0.03, 0.22))
+            jaw_density = float(np.clip(signals.get("jaw_edge_density", 0.15), 0.04, 0.35))
+
+            # Later inputs get slightly stronger influence to support iterative improvement.
+            blend = 0.08 + (0.12 * ((idx + 1) / total_steps))
+
+            x = verts[:, 0]
+            y = verts[:, 1]
+            z = verts[:, 2]
+
+            # Mid-face refinement around eye/nose region.
+            mid_mask = (y > -scale * 0.05) & (y < scale * 0.45) & (z > 0)
+            verts[mid_mask, 2] += blend * scale * (0.02 + nose_bridge * 0.06)
+
+            # Eye band indentation to separate brow/eye planes.
+            eye_mask = (np.abs(y - (scale * 0.22)) < scale * 0.13) & (np.abs(x) > scale * 0.10) & (z > 0)
+            verts[eye_mask, 2] -= blend * scale * (0.015 + eye_contrast * 0.04)
+
+            # Jaw width adaptation in lower band.
+            lower_mask = y < (-scale * 0.10)
+            jaw_scale = 1.0 - (blend * (0.05 + jaw_density * 0.10))
+            verts[lower_mask, 0] *= jaw_scale
+
+            # Symmetry regularization to avoid random asymmetry artifacts.
+            verts[:, 0] *= 0.98 + (symmetry - 0.55) * 0.03
+
+        mesh.vertices = verts
+        return mesh
 
     def _mesh_to_glb(self, mesh: trimesh.Trimesh) -> bytes:
         """Convert trimesh to GLB binary format."""

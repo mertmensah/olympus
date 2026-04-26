@@ -275,6 +275,7 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
             "subject_domain": "human",
             "reconstruction_focus": "facial_likeness",
             "face_signals": face_signals.get("signals", {}),
+            "per_input_face_signals": face_signals.get("per_input", []),
         },
     )
 
@@ -311,6 +312,10 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
         "quality_score_input_raw": round(quality_score_raw, 2),
         "selected_assets": selected_assets,
         "face_signals": face_signals,
+        "iteration": {
+            "mode": "per_input_refinement",
+            "input_steps": len(face_signals.get("per_input", [])),
+        },
         "mode": "adapter-driven",
         "adapter": {
             "name": adapter_output.adapter_name,
