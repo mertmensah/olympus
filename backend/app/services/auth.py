@@ -12,9 +12,9 @@ def _verify_supabase_access_token(access_token: str) -> AuthUser:
         raise HTTPException(status_code=500, detail="SUPABASE_URL not configured")
 
     auth_url = f"{settings.supabase_url}/auth/v1/user"
-    api_key = settings.supabase_secret_key or settings.supabase_anon_key
+    api_key = settings.supabase_anon_key or settings.supabase_secret_key
     if not api_key:
-        raise HTTPException(status_code=500, detail="Supabase API key not configured")
+        raise HTTPException(status_code=500, detail="Supabase API key not configured (SUPABASE_ANON_KEY or SUPABASE_SECRET_KEY)")
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -27,10 +27,17 @@ def _verify_supabase_access_token(access_token: str) -> AuthUser:
         raise HTTPException(status_code=503, detail=f"Auth verification failed: {exc}") from exc
 
     if response.status_code >= 400:
-        raise HTTPException(status_code=401, detail="Invalid or expired access token")
+        raise HTTPException(
+            status_code=401,
+            detail=f"Invalid or expired access token (Supabase status: {response.status_code})",
+        )
 
     payload = response.json()
-    return AuthUser(id=str(payload.get("id")), email=payload.get("email"))
+    user_id = payload.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token verification returned no user id")
+
+    return AuthUser(id=str(user_id), email=payload.get("email"))
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> AuthUser:

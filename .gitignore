@@ -7,4 +7,5 @@ __pycache__/
 .env
 .env.*
 !backend/.env.example
+!frontend/.env.example
 backend/data/

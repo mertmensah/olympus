@@ -142,8 +142,16 @@ If you prefer to run backend and frontend separately without Docker:
 ```bash
 cd frontend
 npm install
+cp .env.example .env
 npm run dev
 # Available at http://localhost:5173
+```
+
+Set frontend Supabase values in `frontend/.env`:
+```bash
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+VITE_SUPABASE_BUCKET=olympus_media
 ```
 
 ### Backend

@@ -1,9 +1,43 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = "https://ckoaboxkgbyjplmyylau.supabase.co";
-const SUPABASE_BUCKET = "olympus_media";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrb2Fib3hrZ2J5anBsbXl5bGF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzAyNzI2NDEsImV4cCI6MTc2MTgwODY0MX0.s2QGJ2NE42E1Zy9B47h1hJJUCjuHDLmfQVnVUB1w4-k";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SUPABASE_BUCKET = import.meta.env.VITE_SUPABASE_BUCKET || "olympus_media";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    const payload = parts[1]
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
+
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+
+function assertSupabaseConfig() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error(
+      "Missing Supabase frontend config. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env."
+    );
+  }
+
+  const payload = decodeJwtPayload(SUPABASE_ANON_KEY);
+  if (payload?.exp && Date.now() >= Number(payload.exp) * 1000) {
+    throw new Error(
+      "VITE_SUPABASE_ANON_KEY is expired. Generate a new publishable/anon key in Supabase and update frontend/.env."
+    );
+  }
+}
+
+assertSupabaseConfig();
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -61,7 +95,6 @@ export function getSupabaseStorageUrl(fileKey) {
  * @returns {string} Signed URL with token
  */
 export function getSignedSupabaseUrl(fileKey) {
-  // For private buckets, would need to use signedUrls with auth
-  // For now, use public URL as our bucket is private but we handle auth on backend
+  // Legacy helper retained for compatibility. Prefer backend-protected file serving.
   return `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${encodeURIComponent(fileKey)}?token=${SUPABASE_ANON_KEY}`;
 }
