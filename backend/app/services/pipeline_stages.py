@@ -230,7 +230,7 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
         raise RuntimeError("Job record not found during reconstruct stage")
 
     artifacts = database.list_job_artifacts(job_id)
-    quality_artifact = next((artifact for artifact in artifacts if artifact.stage == "quality"), None)
+    quality_artifact = next((artifact for artifact in reversed(artifacts) if artifact.stage == "quality"), None)
     quality_score_raw = float(quality_artifact.payload.get("quality_score", 0.0)) if quality_artifact else 0.0
     quality_score = max(0.0, min(1.0, quality_score_raw / 100.0))
 
@@ -349,8 +349,8 @@ def run_deliver_stage(job_id: UUID) -> dict:
     if record and record.subject_id:
         subject_id = record.subject_id
         artifacts = database.list_job_artifacts(job_id)
-        reconstruct = next((a for a in artifacts if a.stage == "reconstruct"), None)
-        quality = next((a for a in artifacts if a.stage == "quality"), None)
+        reconstruct = next((a for a in reversed(artifacts) if a.stage == "reconstruct"), None)
+        quality = next((a for a in reversed(artifacts) if a.stage == "quality"), None)
 
         if reconstruct:
             src_key: str = reconstruct.payload.get("output_asset_key", "")

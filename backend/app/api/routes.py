@@ -111,7 +111,7 @@ def get_reconstruction_file(job_id: UUID) -> Response:
         raise HTTPException(status_code=404, detail="Job not found")
 
     artifacts = job_store.list_artifacts(job_id)
-    reconstruct = next((a for a in artifacts if a.stage == "reconstruct"), None)
+    reconstruct = next((a for a in reversed(artifacts) if a.stage == "reconstruct"), None)
     if reconstruct is None:
         raise HTTPException(status_code=404, detail="Reconstruct artifact not found")
 
@@ -156,7 +156,7 @@ def get_job_debug(job_id: UUID) -> dict:
 
     assets = job_store.list_assets(job_id)
     artifacts = job_store.list_artifacts(job_id)
-    reconstruct = next((a for a in artifacts if a.stage == "reconstruct"), None)
+    reconstruct = next((a for a in reversed(artifacts) if a.stage == "reconstruct"), None)
     file_key = reconstruct.payload.get("output_asset_key") if reconstruct else None
 
     storage_probe = {"ok": False, "size_bytes": 0, "error": None}
@@ -198,8 +198,8 @@ def get_job_input_feedback(job_id: UUID) -> dict:
         raise HTTPException(status_code=404, detail="Job not found")
 
     artifacts = job_store.list_artifacts(job_id)
-    quality = next((a for a in artifacts if a.stage == "quality"), None)
-    reconstruct = next((a for a in artifacts if a.stage == "reconstruct"), None)
+    quality = next((a for a in reversed(artifacts) if a.stage == "quality"), None)
+    reconstruct = next((a for a in reversed(artifacts) if a.stage == "reconstruct"), None)
 
     if quality is None:
         raise HTTPException(status_code=404, detail="Quality artifact not found yet")
