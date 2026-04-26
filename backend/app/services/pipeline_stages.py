@@ -82,6 +82,9 @@ def run_quality_stage(job_id: UUID) -> dict:
     coverage_score = min(100.0, (photos * 6.0) + (videos * 16.0))
     asset_scores = [float(report.get("quality_score", 0.0)) for report in asset_reports]
     technical_score = mean(asset_scores) if asset_scores else 0.0
+    input_feedback = [_build_input_feedback(report) for report in asset_reports]
+    rejected_inputs = [item for item in input_feedback if item["value_level"] in {"rejected", "not_valuable"}]
+    low_value_inputs = [item for item in input_feedback if item["value_level"] == "low"]
 
     payload = {
         "job_id": str(job_id),
@@ -95,10 +98,130 @@ def run_quality_stage(job_id: UUID) -> dict:
             "avg_bytes": round(mean(sizes), 2),
         },
         "asset_reports": asset_reports,
+        "input_feedback": {
+            "summary": {
+                "inputs_total": len(input_feedback),
+                "inputs_rejected_or_not_valuable": len(rejected_inputs),
+                "inputs_low_value": len(low_value_inputs),
+                "overall_readiness": _feedback_readiness(len(rejected_inputs), len(low_value_inputs), len(input_feedback)),
+            },
+            "per_input": input_feedback,
+            "global_recommendations": _build_global_recommendations(input_feedback),
+        },
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     _write_stage_output(job_id, "quality", payload)
     return payload
+
+
+def _feedback_readiness(rejected_count: int, low_count: int, total_count: int) -> str:
+    if total_count == 0:
+        return "insufficient"
+    rejected_ratio = rejected_count / total_count
+    low_ratio = low_count / total_count
+    if rejected_ratio >= 0.4:
+        return "poor"
+    if rejected_ratio >= 0.2 or low_ratio >= 0.5:
+        return "fair"
+    return "good"
+
+
+def _build_input_feedback(report: dict) -> dict:
+    content_type = str(report.get("content_type", ""))
+    quality = float(report.get("quality_score", 0.0))
+    file_key = str(report.get("file_key", ""))
+    media_type = str(report.get("media_type", "unknown"))
+
+    inferred: list[str] = []
+    could_not_infer: list[str] = []
+    recommendations: list[str] = []
+    rejection_reason: str | None = None
+
+    if content_type.startswith("audio/"):
+        value_level = "not_valuable"
+        rejection_reason = "Audio is not currently used by reconstruction pipeline."
+        could_not_infer.extend([
+            "facial geometry",
+            "head shape",
+            "identity-aligned facial contours",
+        ])
+        recommendations.append("Keep audio for future persona traits, but upload clear portrait photos for facial likeness.")
+    elif not content_type.startswith("image/") and not content_type.startswith("video/"):
+        value_level = "rejected"
+        rejection_reason = "Unsupported media type for current quality/reconstruction stages."
+        could_not_infer.extend([
+            "facial geometry",
+            "head orientation",
+        ])
+        recommendations.append("Use JPG/PNG portraits or short MP4 clips with frontal and side angles.")
+    else:
+        brightness = float(report.get("brightness_mean", 0.0))
+        edge_variance = float(report.get("edge_variance", 0.0))
+        frame_count = int(report.get("frame_count", 0))
+
+        if media_type == "image":
+            inferred.append("basic facial contour sharpness")
+            inferred.append("lighting/exposure quality")
+            if 85 <= brightness <= 180:
+                inferred.append("usable skin/face tonal separation")
+            else:
+                could_not_infer.append("stable facial tone boundaries")
+                recommendations.append("Avoid overexposed/backlit selfies; use soft front lighting.")
+
+            if edge_variance < 2.5:
+                could_not_infer.append("high-confidence eye/nose/jaw contours")
+                recommendations.append("Submit sharper photos (steady camera, no motion blur).")
+        elif media_type == "video":
+            inferred.append("temporal head-angle variety")
+            if frame_count >= 3:
+                inferred.append("multi-frame pose consistency")
+            else:
+                could_not_infer.append("reliable multi-angle face cues")
+                recommendations.append("Use 3-8 second clips with slow head turn.")
+
+        if quality >= 65:
+            value_level = "high"
+        elif quality >= 40:
+            value_level = "medium"
+        elif quality >= 20:
+            value_level = "low"
+            recommendations.append("Increase face fill ratio: face should occupy ~55-75% of frame.")
+        else:
+            value_level = "not_valuable"
+            rejection_reason = "Input quality too low to reliably improve facial likeness."
+            could_not_infer.append("identity-level facial detail")
+            recommendations.append("Retake with higher resolution and neutral expression from eye level.")
+
+    return {
+        "file_key": file_key,
+        "media_type": media_type,
+        "content_type": content_type,
+        "quality_score": round(quality, 2),
+        "value_level": value_level,
+        "inferred": sorted(set(inferred)),
+        "could_not_infer": sorted(set(could_not_infer)),
+        "recommendations": sorted(set(recommendations)),
+        "rejection_reason": rejection_reason,
+    }
+
+
+def _build_global_recommendations(feedback_items: list[dict]) -> list[str]:
+    recommendations: list[str] = []
+    low_or_rejected = [item for item in feedback_items if item["value_level"] in {"low", "not_valuable", "rejected"}]
+    videos = [item for item in feedback_items if item["media_type"] == "video"]
+    images = [item for item in feedback_items if item["media_type"] == "image"]
+
+    if low_or_rejected:
+        recommendations.append("Replace low-value inputs with 6-12 sharp portrait photos under even frontal lighting.")
+    if len(images) < 4:
+        recommendations.append("Add more portrait photos: frontal, 30°, 60°, and profile angles.")
+    if not videos:
+        recommendations.append("Add one short slow-turn video to improve side-geometry consistency.")
+
+    if not recommendations:
+        recommendations.append("Current inputs are high-value; continue adding varied lighting and angle coverage for refinement.")
+
+    return recommendations
 
 
 def run_reconstruct_stage(job_id: UUID) -> dict:

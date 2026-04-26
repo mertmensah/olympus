@@ -191,6 +191,46 @@ def get_job_debug(job_id: UUID) -> dict:
     }
 
 
+@router.get("/jobs/{job_id}/input-feedback")
+def get_job_input_feedback(job_id: UUID) -> dict:
+    job = job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    artifacts = job_store.list_artifacts(job_id)
+    quality = next((a for a in artifacts if a.stage == "quality"), None)
+    reconstruct = next((a for a in artifacts if a.stage == "reconstruct"), None)
+
+    if quality is None:
+        raise HTTPException(status_code=404, detail="Quality artifact not found yet")
+
+    feedback = quality.payload.get("input_feedback", {})
+    per_input = feedback.get("per_input", [])
+    selected_assets = set(reconstruct.payload.get("selected_assets", [])) if reconstruct else set()
+
+    enriched = []
+    for item in per_input:
+        file_key = item.get("file_key", "")
+        enriched.append(
+            {
+                **item,
+                "used_for_reconstruction": file_key in selected_assets,
+            }
+        )
+
+    return {
+        "job": {
+            "id": str(job_id),
+            "status": job.status,
+            "stage": job.stage,
+        },
+        "summary": feedback.get("summary", {}),
+        "global_recommendations": feedback.get("global_recommendations", []),
+        "per_input": enriched,
+        "selected_asset_count": len(selected_assets),
+    }
+
+
 # -----------------------------------------------------------------------
 # Subject routes
 # -----------------------------------------------------------------------
