@@ -158,15 +158,15 @@ export default function ViewerPage({ activeJob }) {
       <h2>3D Output Viewer</h2>
       
       {modelUrl ? (
-        <div style={{ marginBottom: "2rem" }}>
+        <div className="viewer-shell">
           <ModelViewer
             modelUrl={modelUrl}
             onStatusChange={handleViewerStatusChange}
           />
-          <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#999" }}>
+          <p className="viewer-hint">
             Use mouse to rotate, scroll to zoom, right-click to pan
           </p>
-          <p style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#ccc" }}>
+          <p className="viewer-status">
             Viewer status: {viewerStatus}
           </p>
         </div>
@@ -238,7 +238,7 @@ export default function ViewerPage({ activeJob }) {
           ) : null}
 
           {debugInfo ? (
-            <pre style={{ whiteSpace: "pre-wrap", marginTop: "1rem", fontSize: "0.85rem" }}>
+            <pre className="debug-json">
               {JSON.stringify(debugInfo, null, 2)}
             </pre>
           ) : null}

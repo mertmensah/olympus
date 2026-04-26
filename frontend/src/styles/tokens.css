@@ -1,0 +1,33 @@
+:root {
+  --ol-color-sky-050: #f5fbff;
+  --ol-color-sky-100: #eaf6ff;
+  --ol-color-sky-200: #d8ecff;
+  --ol-color-sky-300: #bfdfff;
+  --ol-color-sky-400: #9dcfff;
+  --ol-color-sky-700: #2e5f8f;
+  --ol-color-sky-800: #204b73;
+
+  --ol-text-900: #17314a;
+  --ol-text-700: #3f6282;
+  --ol-line: #cde0f2;
+  --ol-line-strong: #a8c5df;
+
+  --ol-panel: #ffffffd9;
+  --ol-panel-solid: #ffffff;
+  --ol-shadow-sm: 0 8px 20px rgba(65, 108, 146, 0.12);
+  --ol-shadow-md: 0 16px 42px rgba(56, 95, 131, 0.18);
+
+  --ol-radius-sm: 12px;
+  --ol-radius-md: 18px;
+  --ol-radius-lg: 26px;
+
+  --ol-space-1: 0.35rem;
+  --ol-space-2: 0.55rem;
+  --ol-space-3: 0.85rem;
+  --ol-space-4: 1.15rem;
+  --ol-space-5: 1.45rem;
+  --ol-space-6: 1.9rem;
+
+  --ol-font-display: "Palatino Linotype", "Book Antiqua", "Times New Roman", serif;
+  --ol-font-body: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+}

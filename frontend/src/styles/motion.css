@@ -1,0 +1,34 @@
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero,
+.panel,
+.module-card,
+.placeholder-card,
+.feedback-card,
+.step-card {
+  animation: riseIn 260ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero,
+  .panel,
+  .module-card,
+  .placeholder-card,
+  .feedback-card,
+  .step-card,
+  .primary,
+  .ghost,
+  .tabs button {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,53 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--ol-font-body);
+  color: var(--ol-text-900);
+  background:
+    radial-gradient(circle at 8% 12%, #f8fdff 0, #ecf8ff 28%, transparent 55%),
+    radial-gradient(circle at 94% 8%, #d9eeff 0, #eef8ff 35%, transparent 62%),
+    linear-gradient(180deg, #f8fcff 0%, #edf6ff 42%, #f9fcff 100%);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.2;
+  font-family: var(--ol-font-display);
+  letter-spacing: 0.01em;
+}
+
+p {
+  line-height: 1.6;
+  margin: 0;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--ol-color-sky-400);
+  outline-offset: 2px;
+}
+
+.muted {
+  color: var(--ol-text-700);
+}
+
+.error {
+  color: #9a2540;
+  margin-top: var(--ol-space-1);
+}

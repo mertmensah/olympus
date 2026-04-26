@@ -122,7 +122,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <strong>Olympus</strong>
-          <span>Digital Likeness Platform</span>
+          <span>Summit of Digital Immortality</span>
         </div>
         <div className="auth-block">
           {isAuthed ? (

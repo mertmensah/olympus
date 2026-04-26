@@ -1,0 +1,44 @@
+.module-page h2 {
+  margin-bottom: var(--ol-space-2);
+}
+
+.module-stack {
+  display: grid;
+  gap: var(--ol-space-4);
+}
+
+.session-box {
+  grid-column: 1 / -1;
+  max-width: 100%;
+}
+
+.input-feedback-section {
+  margin-top: var(--ol-space-3);
+  border-top: 1px dashed var(--ol-line-strong);
+  padding-top: var(--ol-space-3);
+}
+
+.feedback-global {
+  margin-top: var(--ol-space-2);
+}
+
+.viewer-shell {
+  margin-bottom: var(--ol-space-5);
+}
+
+.viewer-hint,
+.viewer-status {
+  margin-top: var(--ol-space-2);
+  font-size: 0.92rem;
+  color: var(--ol-text-700);
+}
+
+.debug-json {
+  white-space: pre-wrap;
+  margin-top: var(--ol-space-3);
+  font-size: 0.85rem;
+  background: #f7fbff;
+  border: 1px solid var(--ol-line);
+  border-radius: var(--ol-radius-sm);
+  padding: var(--ol-space-3);
+}
