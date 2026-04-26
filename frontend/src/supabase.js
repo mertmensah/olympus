@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
 const SUPABASE_BUCKET = import.meta.env.VITE_SUPABASE_BUCKET || "olympus_media";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+let supabaseConfigError = null;
 
 function decodeJwtPayload(token) {
   try {
@@ -22,30 +23,69 @@ function decodeJwtPayload(token) {
   }
 }
 
-function assertSupabaseConfig() {
+function validateSupabaseConfig() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(
+    return new Error(
       "Missing Supabase frontend config. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env."
     );
   }
 
   const payload = decodeJwtPayload(SUPABASE_ANON_KEY);
   if (payload?.exp && Date.now() >= Number(payload.exp) * 1000) {
-    throw new Error(
+    return new Error(
       "VITE_SUPABASE_ANON_KEY is expired. Generate a new publishable/anon key in Supabase and update frontend/.env."
     );
   }
+
+  return null;
 }
 
-assertSupabaseConfig();
+function createFallbackClient(error) {
+  return {
+    auth: {
+      onAuthStateChange(callback) {
+        if (typeof callback === "function") {
+          callback("INITIAL", null);
+        }
+        return {
+          data: {
+            subscription: {
+              unsubscribe() {},
+            },
+          },
+        };
+      },
+      async signInWithPassword() {
+        return { data: { user: null, session: null }, error };
+      },
+      async signUp() {
+        return { data: { user: null, session: null }, error };
+      },
+      async signOut() {
+        return { error: null };
+      },
+      async getSession() {
+        return { data: { session: null }, error };
+      },
+    },
+  };
+}
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+supabaseConfigError = validateSupabaseConfig();
+
+export const supabase = supabaseConfigError
+  ? createFallbackClient(supabaseConfigError)
+  : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
+
+export function getSupabaseConfigError() {
+  return supabaseConfigError;
+}
 
 export async function signInWithEmail(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });

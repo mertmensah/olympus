@@ -6,7 +6,7 @@ import CommunityPage from "./pages/CommunityPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
 import { setAuthTokenGetter } from "./services/api";
-import { getCurrentSession, signInWithEmail, signOutUser, signUpWithEmail, supabase } from "./supabase";
+import { getCurrentSession, getSupabaseConfigError, signInWithEmail, signOutUser, signUpWithEmail, supabase } from "./supabase";
 
 const TABS = {
   HOME: "home",
@@ -26,9 +26,14 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authConfigError, setAuthConfigError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
+    const configError = getSupabaseConfigError();
+    if (configError) {
+      setAuthConfigError(configError.message || "Supabase auth config is invalid.");
+    }
 
     getCurrentSession()
       .then((nextSession) => {
@@ -132,6 +137,7 @@ export default function App() {
           <span>Summit of Digital Immortality</span>
         </div>
         <div className="auth-block">
+          {authConfigError ? <p className="error">{authConfigError}</p> : null}
           {isAuthed ? (
             <div className="auth-inline">
               <span className="muted">{session.user.email || session.user.id}</span>
@@ -155,7 +161,7 @@ export default function App() {
                 placeholder="Password"
                 required
               />
-              <button className="primary" type="submit">
+              <button className="primary" type="submit" disabled={Boolean(authConfigError)}>
                 {authMode === "signin" ? "Sign In" : "Sign Up"}
               </button>
               <button
