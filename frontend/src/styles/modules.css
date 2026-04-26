@@ -52,3 +52,59 @@
   display: grid;
   gap: var(--ol-space-2);
 }
+
+.community-metrics {
+  margin-top: var(--ol-space-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--ol-space-2);
+}
+
+.metric-card {
+  border: 1px solid var(--ol-line);
+  border-radius: var(--ol-radius-sm);
+  background: #ffffff;
+  padding: var(--ol-space-2);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.metric-card p {
+  font-family: var(--ol-font-display);
+  font-size: 1.1rem;
+}
+
+.connection-form {
+  margin-top: var(--ol-space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--ol-space-2);
+}
+
+.connection-form label {
+  min-width: 260px;
+}
+
+.connection-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ol-space-2);
+  border: 1px solid var(--ol-line);
+  background: #f8fcff;
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+}
+
+.connection-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.build-steps {
+  margin-top: var(--ol-space-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ol-space-2);
+}

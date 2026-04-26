@@ -88,3 +88,26 @@ export function startJobPipeline(jobId) {
     method: "POST"
   });
 }
+
+export function listConnections() {
+  return request("/api/connections");
+}
+
+export function requestConnection(targetUserId) {
+  return request("/api/connections/request", {
+    method: "POST",
+    body: JSON.stringify({ target_user_id: targetUserId })
+  });
+}
+
+export function acceptConnection(connectionId) {
+  return request(`/api/connections/${connectionId}/accept`, {
+    method: "POST"
+  });
+}
+
+export function declineConnection(connectionId) {
+  return request(`/api/connections/${connectionId}/decline`, {
+    method: "POST"
+  });
+}

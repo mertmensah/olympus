@@ -80,8 +80,25 @@ export default function UploadPage({ onJobCreated, onJumpToViewer }) {
 
   return (
     <section className="panel">
-      <h2>Create a Generation Job</h2>
-      <p>This step captures the minimum metadata contract before media ingestion and processing.</p>
+      <p className="eyebrow">Build My Persona</p>
+      <h2>Persona Construction Flow</h2>
+      <p>Submit baseline identity media first, then iterate with refinement uploads over time.</p>
+
+      <div className="build-steps">
+        <article className="step-card">
+          <h3>Step 1: Identity Profile</h3>
+          <p>Set core baseline metadata used during mesh scaling and profile context.</p>
+        </article>
+        <article className="step-card">
+          <h3>Step 2: Capture Upload</h3>
+          <p>Upload portraits and optional videos with clean lighting and angle variation.</p>
+        </article>
+        <article className="step-card">
+          <h3>Step 3: Build + Inspect</h3>
+          <p>Run generation, inspect feedback, then continue refinement cycles from My Persona.</p>
+        </article>
+      </div>
+
       <form onSubmit={handleCreateJob} className="form-grid">
         <label>
           Age
@@ -119,6 +136,7 @@ export default function UploadPage({ onJobCreated, onJumpToViewer }) {
 
         {sessionSummary ? (
           <div className="status-box session-box">
+            <p className="muted"><strong>Upload session ready</strong></p>
             <p>
               <strong>Upload targets generated:</strong> {sessionSummary.totalTargets}
             </p>
