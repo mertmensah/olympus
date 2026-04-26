@@ -11,6 +11,7 @@ body,
 body {
   margin: 0;
   font-family: var(--ol-font-body);
+  font-weight: var(--ol-weight-regular);
   color: var(--ol-text-900);
   background:
     radial-gradient(circle at 8% 12%, #f8fdff 0, #ecf8ff 28%, transparent 55%),
@@ -24,7 +25,12 @@ h3 {
   margin: 0;
   line-height: 1.2;
   font-family: var(--ol-font-display);
+  font-weight: var(--ol-weight-bold);
   letter-spacing: 0.01em;
+}
+
+h1 {
+  font-weight: 800;
 }
 
 p {

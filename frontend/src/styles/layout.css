@@ -27,6 +27,7 @@
 .brand strong {
   font-size: 1.2rem;
   font-family: var(--ol-font-display);
+  font-weight: 800;
   grid-column: 2;
 }
 

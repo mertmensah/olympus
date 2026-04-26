@@ -28,6 +28,10 @@
   --ol-space-5: 1.45rem;
   --ol-space-6: 1.9rem;
 
-  --ol-font-display: "Palatino Linotype", "Book Antiqua", "Times New Roman", serif;
-  --ol-font-body: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  --ol-font-display: "Aptos Display", "Aptos", "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  --ol-font-body: "Aptos", "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+
+  --ol-weight-regular: 400;
+  --ol-weight-medium: 600;
+  --ol-weight-bold: 700;
 }
