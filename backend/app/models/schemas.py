@@ -107,13 +107,16 @@ class AuthUser(BaseModel):
 
 
 class ConnectionRequestCreate(BaseModel):
-    target_user_id: str = Field(min_length=3, max_length=128)
+    target_email: str | None = Field(default=None, min_length=3, max_length=254)
+    target_user_id: str | None = Field(default=None, min_length=3, max_length=128)
 
 
 class ConnectionRecord(BaseModel):
     id: int
     requester_user_id: str
     target_user_id: str
+    requester_email: str | None = None
+    target_email: str | None = None
     status: Literal["pending", "accepted", "declined"]
     created_at: datetime
     updated_at: datetime

@@ -3,7 +3,7 @@ import { acceptConnection, declineConnection, listConnections, requestConnection
 
 export default function ConnectionsPage() {
   const [connections, setConnections] = useState([]);
-  const [targetUserId, setTargetUserId] = useState("");
+  const [targetEmail, setTargetEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -36,12 +36,12 @@ export default function ConnectionsPage() {
 
   async function handleRequestConnection(event) {
     event.preventDefault();
-    if (!targetUserId.trim()) {
+    if (!targetEmail.trim()) {
       return;
     }
     try {
-      await requestConnection(targetUserId.trim());
-      setTargetUserId("");
+      await requestConnection(targetEmail.trim().toLowerCase());
+      setTargetEmail("");
       await refreshConnections();
     } catch (requestError) {
       setError(requestError.message || "Could not send connection request.");
@@ -71,12 +71,12 @@ export default function ConnectionsPage() {
 
       <form className="connection-form" onSubmit={handleRequestConnection}>
         <label>
-          Connect with user id
+          Connect with user email
           <input
-            type="text"
-            value={targetUserId}
-            onChange={(event) => setTargetUserId(event.target.value)}
-            placeholder="target user id"
+            type="email"
+            value={targetEmail}
+            onChange={(event) => setTargetEmail(event.target.value)}
+            placeholder="friend@example.com"
           />
         </label>
         <button type="submit" className="primary">Send Request</button>
@@ -89,7 +89,7 @@ export default function ConnectionsPage() {
           {!loading && incomingPending.length === 0 ? <p className="muted">No pending requests.</p> : null}
           {incomingPending.map((item) => (
             <div key={item.id} className="connection-row">
-              <span>{item.requester_user_id}</span>
+              <span>{item.requester_email || item.requester_user_id}</span>
               <div className="connection-actions">
                 <button className="ghost" type="button" onClick={() => handleDecision(item.id, "accept")}>Accept</button>
                 <button className="ghost" type="button" onClick={() => handleDecision(item.id, "decline")}>Decline</button>
@@ -104,7 +104,7 @@ export default function ConnectionsPage() {
           {!loading && accepted.length === 0 ? <p className="muted">No accepted connections yet.</p> : null}
           {accepted.map((item) => (
             <div key={item.id} className="connection-row">
-              <span>{item.requester_user_id} ↔ {item.target_user_id}</span>
+              <span>{item.requester_email || item.requester_user_id} ↔ {item.target_email || item.target_user_id}</span>
               <span className="value-badge value-high">accepted</span>
             </div>
           ))}

@@ -5,6 +5,7 @@ from fastapi import Header, HTTPException
 
 from app.core.config import settings
 from app.models.schemas import AuthUser
+from app.services.database import database
 
 
 def _verify_supabase_access_token(access_token: str) -> AuthUser:
@@ -37,7 +38,9 @@ def _verify_supabase_access_token(access_token: str) -> AuthUser:
     if not user_id:
         raise HTTPException(status_code=401, detail="Token verification returned no user id")
 
-    return AuthUser(id=str(user_id), email=payload.get("email"))
+    email = payload.get("email")
+    database.upsert_user_profile(str(user_id), email)
+    return AuthUser(id=str(user_id), email=email)
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> AuthUser:

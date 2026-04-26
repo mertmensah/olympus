@@ -93,10 +93,10 @@ export function listConnections() {
   return request("/api/connections");
 }
 
-export function requestConnection(targetUserId) {
+export function requestConnection(targetEmail) {
   return request("/api/connections/request", {
     method: "POST",
-    body: JSON.stringify({ target_user_id: targetUserId })
+    body: JSON.stringify({ target_email: targetEmail })
   });
 }
 

@@ -95,6 +95,16 @@ class Database:
             )
             self._connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS user_profiles (
+                    user_id TEXT PRIMARY KEY,
+                    email TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            self._connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS subject_revisions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     subject_id TEXT NOT NULL REFERENCES subjects(id),
@@ -117,6 +127,46 @@ class Database:
                 self._connection.execute("ALTER TABLE subjects ADD COLUMN user_id TEXT NOT NULL DEFAULT 'anonymous'")
 
             self._connection.commit()
+
+    def upsert_user_profile(self, user_id: str, email: str | None) -> None:
+        if not email:
+            return
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        normalized_email = email.strip().lower()
+        with self._lock:
+            self._connection.execute(
+                """
+                INSERT INTO user_profiles (user_id, email, created_at, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    email = excluded.email,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, normalized_email, now_iso, now_iso),
+            )
+            self._connection.commit()
+
+    def get_user_id_by_email(self, email: str) -> str | None:
+        normalized_email = email.strip().lower()
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT user_id FROM user_profiles WHERE email = ?",
+                (normalized_email,),
+            ).fetchone()
+        if row is None:
+            return None
+        return row["user_id"]
+
+    def get_user_email(self, user_id: str) -> str | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT email FROM user_profiles WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return row["email"]
 
     def create_job(
         self,
@@ -469,6 +519,8 @@ class Database:
             id=row["id"],
             requester_user_id=row["requester_user_id"],
             target_user_id=row["target_user_id"],
+            requester_email=self.get_user_email(row["requester_user_id"]),
+            target_email=self.get_user_email(row["target_user_id"]),
             status=row["status"],
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
@@ -478,9 +530,19 @@ class Database:
         with self._lock:
             rows = self._connection.execute(
                 """
-                SELECT id, requester_user_id, target_user_id, status, created_at, updated_at
-                FROM user_connections
-                WHERE requester_user_id = ? OR target_user_id = ?
+                SELECT
+                    c.id,
+                    c.requester_user_id,
+                    c.target_user_id,
+                    c.status,
+                    c.created_at,
+                    c.updated_at,
+                    ru.email AS requester_email,
+                    tu.email AS target_email
+                FROM user_connections c
+                LEFT JOIN user_profiles ru ON ru.user_id = c.requester_user_id
+                LEFT JOIN user_profiles tu ON tu.user_id = c.target_user_id
+                WHERE c.requester_user_id = ? OR c.target_user_id = ?
                 ORDER BY updated_at DESC
                 """,
                 (user_id, user_id),
@@ -490,6 +552,8 @@ class Database:
                 id=row["id"],
                 requester_user_id=row["requester_user_id"],
                 target_user_id=row["target_user_id"],
+                requester_email=row["requester_email"],
+                target_email=row["target_email"],
                 status=row["status"],
                 created_at=datetime.fromisoformat(row["created_at"]),
                 updated_at=datetime.fromisoformat(row["updated_at"]),
@@ -524,6 +588,8 @@ class Database:
             id=updated["id"],
             requester_user_id=updated["requester_user_id"],
             target_user_id=updated["target_user_id"],
+            requester_email=self.get_user_email(updated["requester_user_id"]),
+            target_email=self.get_user_email(updated["target_user_id"]),
             status=updated["status"],
             created_at=datetime.fromisoformat(updated["created_at"]),
             updated_at=datetime.fromisoformat(updated["updated_at"]),

@@ -319,9 +319,28 @@ def get_subject_reconstruction(subject_id: UUID, user: AuthUser = Depends(get_cu
 
 @router.post("/connections/request", response_model=ConnectionRecord, status_code=201)
 def request_connection(payload: ConnectionRequestCreate, user: AuthUser = Depends(get_current_user)) -> ConnectionRecord:
-    if payload.target_user_id == user.id:
-        raise HTTPException(status_code=400, detail="Cannot connect to yourself")
-    return database.create_connection_request(user.id, payload.target_user_id)
+    target_user_id: str | None = None
+
+    if payload.target_email:
+        target_email = payload.target_email.strip().lower()
+        current_email = (user.email or "").strip().lower()
+        if current_email and target_email == current_email:
+            raise HTTPException(status_code=400, detail="Cannot connect to yourself")
+
+        target_user_id = database.get_user_id_by_email(target_email)
+        if target_user_id is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No Olympus user found with that email. Ask them to sign in at least once.",
+            )
+    elif payload.target_user_id:
+        target_user_id = payload.target_user_id.strip()
+        if target_user_id == user.id:
+            raise HTTPException(status_code=400, detail="Cannot connect to yourself")
+    else:
+        raise HTTPException(status_code=400, detail="Provide target_email or target_user_id")
+
+    return database.create_connection_request(user.id, target_user_id)
 
 
 @router.get("/connections", response_model=list[ConnectionRecord])
