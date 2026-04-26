@@ -8,7 +8,7 @@ from uuid import UUID
 
 import json
 
-from app.models.schemas import JobArtifact, JobCreateRequest, JobRecord, JobStatus, MediaSummary, SubjectRecord, SubjectRevision, UploadedAsset
+from app.models.schemas import ConnectionRecord, JobArtifact, JobCreateRequest, JobRecord, JobStatus, MediaSummary, SubjectRecord, SubjectRevision, UploadedAsset
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 DB_PATH = DATA_DIR / "olympus.db"
@@ -68,6 +68,7 @@ class Database:
                 """
                 CREATE TABLE IF NOT EXISTS subjects (
                     id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL DEFAULT 'anonymous',
                     display_name TEXT NOT NULL DEFAULT '',
                     age INTEGER NOT NULL,
                     height_cm INTEGER NOT NULL,
@@ -76,6 +77,19 @@ class Database:
                     current_glb_key TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_connections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    requester_user_id TEXT NOT NULL,
+                    target_user_id TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(requester_user_id, target_user_id)
                 )
                 """
             )
@@ -95,15 +109,28 @@ class Database:
             existing_cols = {row[1] for row in self._connection.execute("PRAGMA table_info(jobs)").fetchall()}
             if "subject_id" not in existing_cols:
                 self._connection.execute("ALTER TABLE jobs ADD COLUMN subject_id TEXT REFERENCES subjects(id)")
+            if "user_id" not in existing_cols:
+                self._connection.execute("ALTER TABLE jobs ADD COLUMN user_id TEXT")
+
+            subject_cols = {row[1] for row in self._connection.execute("PRAGMA table_info(subjects)").fetchall()}
+            if "user_id" not in subject_cols:
+                self._connection.execute("ALTER TABLE subjects ADD COLUMN user_id TEXT NOT NULL DEFAULT 'anonymous'")
+
             self._connection.commit()
 
-    def create_job(self, job_id: UUID, payload: JobCreateRequest, subject_id: UUID | None = None) -> JobStatus:
+    def create_job(
+        self,
+        job_id: UUID,
+        payload: JobCreateRequest,
+        subject_id: UUID | None = None,
+        user_id: str | None = None,
+    ) -> JobStatus:
         now_iso = datetime.now(timezone.utc).isoformat()
         with self._lock:
             self._connection.execute(
                 """
-                INSERT INTO jobs (id, age, height_cm, photo_count, video_count, status, stage, created_at, subject_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO jobs (id, age, height_cm, photo_count, video_count, status, stage, created_at, subject_id, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(job_id),
@@ -115,6 +142,7 @@ class Database:
                     "ingest",
                     now_iso,
                     str(subject_id) if subject_id else None,
+                    user_id,
                 ),
             )
             self._connection.commit()
@@ -134,7 +162,7 @@ class Database:
         with self._lock:
             row = self._connection.execute(
                 """
-                SELECT id, age, height_cm, photo_count, video_count, status, stage, created_at, subject_id
+                SELECT id, age, height_cm, photo_count, video_count, status, stage, created_at, subject_id, user_id
                 FROM jobs
                 WHERE id = ?
                 """,
@@ -152,7 +180,15 @@ class Database:
             stage=row["stage"],
             created_at=datetime.fromisoformat(row["created_at"]),
             subject_id=UUID(row["subject_id"]) if row["subject_id"] else None,
+            user_id=row["user_id"],
         )
+
+    def get_job_owner(self, job_id: UUID) -> str | None:
+        with self._lock:
+            row = self._connection.execute("SELECT user_id FROM jobs WHERE id = ?", (str(job_id),)).fetchone()
+        if row is None:
+            return None
+        return row["user_id"]
 
     def update_job_state(self, job_id: UUID, status: str, stage: str) -> JobStatus | None:
         with self._lock:
@@ -272,15 +308,15 @@ class Database:
     # Subject methods
     # ------------------------------------------------------------------
 
-    def create_subject(self, subject_id: UUID, display_name: str, age: int, height_cm: int) -> SubjectRecord:
+    def create_subject(self, subject_id: UUID, user_id: str, display_name: str, age: int, height_cm: int) -> SubjectRecord:
         now_iso = datetime.now(timezone.utc).isoformat()
         with self._lock:
             self._connection.execute(
                 """
-                INSERT INTO subjects (id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 0, 0.0, NULL, ?, ?)
+                INSERT INTO subjects (id, user_id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 0, 0.0, NULL, ?, ?)
                 """,
-                (str(subject_id), display_name, age, height_cm, now_iso, now_iso),
+                (str(subject_id), user_id, display_name, age, height_cm, now_iso, now_iso),
             )
             self._connection.commit()
         return self.get_subject(subject_id)  # type: ignore[return-value]
@@ -288,13 +324,14 @@ class Database:
     def get_subject(self, subject_id: UUID) -> SubjectRecord | None:
         with self._lock:
             row = self._connection.execute(
-                "SELECT id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at FROM subjects WHERE id = ?",
+                "SELECT id, user_id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at FROM subjects WHERE id = ?",
                 (str(subject_id),),
             ).fetchone()
         if row is None:
             return None
         return SubjectRecord(
             id=UUID(row["id"]),
+            user_id=row["user_id"],
             display_name=row["display_name"],
             age=row["age"],
             height_cm=row["height_cm"],
@@ -305,14 +342,21 @@ class Database:
             updated_at=datetime.fromisoformat(row["updated_at"]),
         )
 
-    def list_subjects(self) -> list[SubjectRecord]:
+    def list_subjects(self, user_id: str | None = None) -> list[SubjectRecord]:
         with self._lock:
-            rows = self._connection.execute(
-                "SELECT id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at FROM subjects ORDER BY created_at DESC"
-            ).fetchall()
+            if user_id:
+                rows = self._connection.execute(
+                    "SELECT id, user_id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at FROM subjects WHERE user_id = ? ORDER BY created_at DESC",
+                    (user_id,),
+                ).fetchall()
+            else:
+                rows = self._connection.execute(
+                    "SELECT id, user_id, display_name, age, height_cm, generation, confidence, current_glb_key, created_at, updated_at FROM subjects ORDER BY created_at DESC"
+                ).fetchall()
         return [
             SubjectRecord(
                 id=UUID(row["id"]),
+                user_id=row["user_id"],
                 display_name=row["display_name"],
                 age=row["age"],
                 height_cm=row["height_cm"],
@@ -324,6 +368,14 @@ class Database:
             )
             for row in rows
         ]
+
+    def user_owns_subject(self, user_id: str, subject_id: UUID) -> bool:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT 1 FROM subjects WHERE id = ? AND user_id = ?",
+                (str(subject_id), user_id),
+            ).fetchone()
+        return row is not None
 
     def promote_subject_glb(self, subject_id: UUID, new_glb_key: str, quality_score: float) -> None:
         """Update the subject's current GLB and increment generation + confidence."""
@@ -387,6 +439,95 @@ class Database:
             )
             for row in rows
         ]
+
+    # ------------------------------------------------------------------
+    # Social connections
+    # ------------------------------------------------------------------
+
+    def create_connection_request(self, requester_user_id: str, target_user_id: str) -> ConnectionRecord:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            self._connection.execute(
+                """
+                INSERT OR IGNORE INTO user_connections (requester_user_id, target_user_id, status, created_at, updated_at)
+                VALUES (?, ?, 'pending', ?, ?)
+                """,
+                (requester_user_id, target_user_id, now_iso, now_iso),
+            )
+            self._connection.commit()
+
+            row = self._connection.execute(
+                """
+                SELECT id, requester_user_id, target_user_id, status, created_at, updated_at
+                FROM user_connections
+                WHERE requester_user_id = ? AND target_user_id = ?
+                """,
+                (requester_user_id, target_user_id),
+            ).fetchone()
+
+        return ConnectionRecord(
+            id=row["id"],
+            requester_user_id=row["requester_user_id"],
+            target_user_id=row["target_user_id"],
+            status=row["status"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+        )
+
+    def list_connections_for_user(self, user_id: str) -> list[ConnectionRecord]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT id, requester_user_id, target_user_id, status, created_at, updated_at
+                FROM user_connections
+                WHERE requester_user_id = ? OR target_user_id = ?
+                ORDER BY updated_at DESC
+                """,
+                (user_id, user_id),
+            ).fetchall()
+        return [
+            ConnectionRecord(
+                id=row["id"],
+                requester_user_id=row["requester_user_id"],
+                target_user_id=row["target_user_id"],
+                status=row["status"],
+                created_at=datetime.fromisoformat(row["created_at"]),
+                updated_at=datetime.fromisoformat(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def update_connection_status(self, connection_id: int, user_id: str, status: str) -> ConnectionRecord | None:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT id, requester_user_id, target_user_id, status, created_at, updated_at FROM user_connections WHERE id = ?",
+                (connection_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            if row["target_user_id"] != user_id:
+                return None
+
+            self._connection.execute(
+                "UPDATE user_connections SET status = ?, updated_at = ? WHERE id = ?",
+                (status, now_iso, connection_id),
+            )
+            self._connection.commit()
+
+            updated = self._connection.execute(
+                "SELECT id, requester_user_id, target_user_id, status, created_at, updated_at FROM user_connections WHERE id = ?",
+                (connection_id,),
+            ).fetchone()
+
+        return ConnectionRecord(
+            id=updated["id"],
+            requester_user_id=updated["requester_user_id"],
+            target_user_id=updated["target_user_id"],
+            status=updated["status"],
+            created_at=datetime.fromisoformat(updated["created_at"]),
+            updated_at=datetime.fromisoformat(updated["updated_at"]),
+        )
 
 
 database = Database()

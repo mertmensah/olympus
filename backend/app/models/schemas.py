@@ -29,6 +29,7 @@ class JobRecord(JobStatus):
     media_summary: MediaSummary
     created_at: datetime
     subject_id: UUID | None = None
+    user_id: str | None = None
 
 
 class UploadTarget(BaseModel):
@@ -80,6 +81,7 @@ class SubjectCreateRequest(BaseModel):
 
 class SubjectRecord(BaseModel):
     id: UUID
+    user_id: str
     display_name: str
     age: int
     height_cm: int
@@ -97,3 +99,21 @@ class SubjectRevision(BaseModel):
     glb_key: str
     quality_score: float
     created_at: datetime
+
+
+class AuthUser(BaseModel):
+    id: str
+    email: str | None = None
+
+
+class ConnectionRequestCreate(BaseModel):
+    target_user_id: str = Field(min_length=3, max_length=128)
+
+
+class ConnectionRecord(BaseModel):
+    id: int
+    requester_user_id: str
+    target_user_id: str
+    status: Literal["pending", "accepted", "declined"]
+    created_at: datetime
+    updated_at: datetime

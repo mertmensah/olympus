@@ -44,6 +44,28 @@ body {
   font-size: 0.85rem;
 }
 
+.auth-block {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.auth-form {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.auth-form input {
+  width: 170px;
+}
+
+.auth-inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .tabs {
   display: flex;
   gap: 0.5rem;
@@ -297,5 +319,9 @@ input {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.65rem;
+  }
+
+  .auth-form input {
+    width: 100%;
   }
 }

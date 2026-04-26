@@ -1,9 +1,16 @@
 const API_BASE = "http://localhost:8000";
+let accessTokenGetter = () => null;
+
+export function setAuthTokenGetter(getter) {
+  accessTokenGetter = typeof getter === "function" ? getter : () => null;
+}
 
 async function request(path, options = {}) {
+  const accessToken = accessTokenGetter();
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(options.headers || {})
     },
     ...options

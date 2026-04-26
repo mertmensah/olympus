@@ -25,6 +25,7 @@ class Settings(BaseModel):
     low_quality_adapter: str = os.getenv("OLYMPUS_LOW_QUALITY_ADAPTER", "mock_v1")
     ab_split: float = float(os.getenv("OLYMPUS_AB_SPLIT", "0.5"))
     supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
     supabase_secret_key: str = os.getenv("SUPABASE_SECRET_KEY", os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""))
     supabase_bucket_name: str = os.getenv("SUPABASE_BUCKET_NAME", "olympus_media")
 
