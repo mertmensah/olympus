@@ -20,6 +20,10 @@
 
 .feedback-global {
   margin-top: var(--ol-space-2);
+  background: #f6fbff;
+  border: 1px solid var(--ol-line);
+  border-radius: var(--ol-radius-sm);
+  padding: var(--ol-space-2);
 }
 
 .viewer-shell {
@@ -41,4 +45,10 @@
   border: 1px solid var(--ol-line);
   border-radius: var(--ol-radius-sm);
   padding: var(--ol-space-3);
+}
+
+.style-guide-section {
+  margin-top: var(--ol-space-4);
+  display: grid;
+  gap: var(--ol-space-2);
 }

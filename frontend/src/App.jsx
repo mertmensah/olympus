@@ -4,6 +4,7 @@ import UploadPage from "./pages/UploadPage";
 import MyPersonaPage from "./pages/MyPersonaPage";
 import CommunityPage from "./pages/CommunityPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
+import StyleGuidePage from "./pages/StyleGuidePage";
 import { setAuthTokenGetter } from "./services/api";
 import { getCurrentSession, signInWithEmail, signOutUser, signUpWithEmail, supabase } from "./supabase";
 
@@ -12,7 +13,8 @@ const TABS = {
   MY_PERSONA: "my-persona",
   COMMUNITY: "community",
   CONNECTIONS: "connections",
-  BUILD_PERSONA: "build-persona"
+  BUILD_PERSONA: "build-persona",
+  STYLE_GUIDE: "style-guide"
 };
 
 export default function App() {
@@ -114,6 +116,10 @@ export default function App() {
       );
     }
 
+    if (tab === TABS.STYLE_GUIDE) {
+      return <StyleGuidePage />;
+    }
+
     return <HomePage onNavigate={setTab} tabs={TABS} />;
   }, [tab, activeJob, authReady, isAuthed, isProtectedTab]);
 
@@ -121,6 +127,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
+          <span className="brand-crest" aria-hidden="true" />
           <strong>Olympus</strong>
           <span>Summit of Digital Immortality</span>
         </div>
@@ -189,6 +196,12 @@ export default function App() {
             onClick={() => setTab(TABS.BUILD_PERSONA)}
           >
             Build My Persona
+          </button>
+          <button
+            className={tab === TABS.STYLE_GUIDE ? "active" : ""}
+            onClick={() => setTab(TABS.STYLE_GUIDE)}
+          >
+            Style Guide
           </button>
         </nav>
       </header>

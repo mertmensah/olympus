@@ -23,7 +23,8 @@ const MODULES = [
 
 export default function HomePage({ onNavigate }) {
   return (
-    <section className="hero">
+    <section className="hero hero-olympus">
+      <div className="hero-atmosphere" aria-hidden="true" />
       <p className="eyebrow">Identity Reconstruction</p>
       <h1>Build and Evolve Your Olympus Persona</h1>
       <p>
