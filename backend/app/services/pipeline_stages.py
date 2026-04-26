@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import subprocess
 import tempfile
 import tracemalloc
@@ -16,6 +17,7 @@ import imageio_ffmpeg
 from PIL import Image, ImageFilter, ImageStat
 
 from app.core.config import settings
+from app.services.face_features import extract_face_signals
 from app.services.database import DATA_DIR, database
 from app.services.model_selector import get_model_selector
 from app.services.reconstruct_adapters.base import ReconstructAdapterInput
@@ -106,9 +108,11 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
 
     artifacts = database.list_job_artifacts(job_id)
     quality_artifact = next((artifact for artifact in artifacts if artifact.stage == "quality"), None)
-    quality_score = float(quality_artifact.payload.get("quality_score", 0.0)) if quality_artifact else 0.0
+    quality_score_raw = float(quality_artifact.payload.get("quality_score", 0.0)) if quality_artifact else 0.0
+    quality_score = max(0.0, min(1.0, quality_score_raw / 100.0))
 
     selected_assets = _select_reconstruction_assets(quality_artifact.payload if quality_artifact else {})
+    face_signals = extract_face_signals(selected_assets)
 
     # Use intelligent model selection
     selector = get_model_selector()
@@ -117,14 +121,24 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
         asset_count=len(selected_assets)
     )
     selection_metadata = selector.get_selection_metadata(quality_score, len(selected_assets))
+    selected_adapter = selection_metadata.get("selected_adapter", adapter_name)
+    enforce_non_mock = os.getenv("OLYMPUS_ENFORCE_NON_MOCK_RECONSTRUCTION", "false").strip().lower() == "true"
+    if selected_adapter == "mock_v1" and enforce_non_mock:
+        raise RuntimeError(
+            "Human-only mode blocks mock_v1 reconstruction. "
+            "Configure a face-capable adapter or disable OLYMPUS_ENFORCE_NON_MOCK_RECONSTRUCTION for local demos."
+        )
+
     logger.info(
         "Reconstruct selection",
         extra={
             "job_id": str(job_id),
             "adapter": adapter_name,
-            "quality_score": round(quality_score, 2),
+            "quality_score": round(quality_score, 4),
+            "quality_score_raw": round(quality_score_raw, 2),
             "asset_count": len(selected_assets),
             "strategy": selection_metadata.get("strategy"),
+            "face_signal_assets": int(face_signals.get("asset_count", 0)),
         },
     )
 
@@ -132,7 +146,13 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
         job_id=str(job_id),
         selected_assets=selected_assets,
         quality_score=quality_score,
-        profile={"age": record.age, "height_cm": record.height_cm},
+        profile={
+            "age": record.age,
+            "height_cm": record.height_cm,
+            "subject_domain": "human",
+            "reconstruction_focus": "facial_likeness",
+            "face_signals": face_signals.get("signals", {}),
+        },
     )
 
     tracemalloc.start()
@@ -164,8 +184,10 @@ def run_reconstruct_stage(job_id: UUID) -> dict:
         "job_id": str(job_id),
         "output_asset_key": adapter_output.output_asset_key,
         "estimated_vertices": int(adapter_output.metadata.get("estimated_vertices", 0)),
-        "quality_score_input": round(quality_score, 2),
+        "quality_score_input": round(quality_score, 4),
+        "quality_score_input_raw": round(quality_score_raw, 2),
         "selected_assets": selected_assets,
+        "face_signals": face_signals,
         "mode": "adapter-driven",
         "adapter": {
             "name": adapter_output.adapter_name,
@@ -336,4 +358,9 @@ def _analyze_video(blob: bytes) -> dict:
 def _select_reconstruction_assets(quality_payload: dict) -> list[str]:
     reports = quality_payload.get("asset_reports", [])
     scored = sorted(reports, key=lambda item: float(item.get("quality_score", 0.0)), reverse=True)
+    photos = [item for item in scored if item.get("media_type") == "image"]
+    if photos:
+        return [item.get("file_key", "") for item in photos[:6] if item.get("file_key")]
+
+    # Fallback for legacy payloads where media_type is missing.
     return [item.get("file_key", "") for item in scored[:6] if item.get("file_key")]
