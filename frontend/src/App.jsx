@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import HomePage from "./pages/HomePage";
 import UploadPage from "./pages/UploadPage";
-import ViewerPage from "./pages/ViewerPage";
+import MyPersonaPage from "./pages/MyPersonaPage";
+import CommunityPage from "./pages/CommunityPage";
+import ConnectionsPage from "./pages/ConnectionsPage";
 
 const TABS = {
   HOME: "home",
-  UPLOAD: "upload",
-  VIEWER: "viewer"
+  MY_PERSONA: "my-persona",
+  COMMUNITY: "community",
+  CONNECTIONS: "connections",
+  BUILD_PERSONA: "build-persona"
 };
 
 export default function App() {
@@ -14,15 +18,28 @@ export default function App() {
   const [activeJob, setActiveJob] = useState(null);
 
   const content = useMemo(() => {
-    if (tab === TABS.UPLOAD) {
-      return <UploadPage onJobCreated={setActiveJob} onJumpToViewer={() => setTab(TABS.VIEWER)} />;
+    if (tab === TABS.MY_PERSONA) {
+      return <MyPersonaPage activeJob={activeJob} onBuildPersona={() => setTab(TABS.BUILD_PERSONA)} />;
     }
 
-    if (tab === TABS.VIEWER) {
-      return <ViewerPage activeJob={activeJob} />;
+    if (tab === TABS.COMMUNITY) {
+      return <CommunityPage />;
     }
 
-    return <HomePage onStart={() => setTab(TABS.UPLOAD)} />;
+    if (tab === TABS.CONNECTIONS) {
+      return <ConnectionsPage />;
+    }
+
+    if (tab === TABS.BUILD_PERSONA) {
+      return (
+        <UploadPage
+          onJobCreated={setActiveJob}
+          onJumpToViewer={() => setTab(TABS.MY_PERSONA)}
+        />
+      );
+    }
+
+    return <HomePage onNavigate={setTab} tabs={TABS} />;
   }, [tab, activeJob]);
 
   return (
@@ -36,11 +53,29 @@ export default function App() {
           <button className={tab === TABS.HOME ? "active" : ""} onClick={() => setTab(TABS.HOME)}>
             Home
           </button>
-          <button className={tab === TABS.UPLOAD ? "active" : ""} onClick={() => setTab(TABS.UPLOAD)}>
-            Upload
+          <button
+            className={tab === TABS.MY_PERSONA ? "active" : ""}
+            onClick={() => setTab(TABS.MY_PERSONA)}
+          >
+            My Persona
           </button>
-          <button className={tab === TABS.VIEWER ? "active" : ""} onClick={() => setTab(TABS.VIEWER)}>
-            Viewer
+          <button
+            className={tab === TABS.COMMUNITY ? "active" : ""}
+            onClick={() => setTab(TABS.COMMUNITY)}
+          >
+            Community
+          </button>
+          <button
+            className={tab === TABS.CONNECTIONS ? "active" : ""}
+            onClick={() => setTab(TABS.CONNECTIONS)}
+          >
+            Connections
+          </button>
+          <button
+            className={tab === TABS.BUILD_PERSONA ? "active" : ""}
+            onClick={() => setTab(TABS.BUILD_PERSONA)}
+          >
+            Build My Persona
           </button>
         </nav>
       </header>
