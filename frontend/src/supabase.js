@@ -30,6 +30,12 @@ function validateSupabaseConfig() {
     );
   }
 
+  if (SUPABASE_ANON_KEY.startsWith("sb_secret_")) {
+    return new Error(
+      "VITE_SUPABASE_ANON_KEY is using a Supabase secret/service key. Do not expose secret keys in frontend code. Use anon/publishable key and rotate leaked secret key immediately."
+    );
+  }
+
   const payload = decodeJwtPayload(SUPABASE_ANON_KEY);
   if (payload?.exp && Date.now() >= Number(payload.exp) * 1000) {
     return new Error(
